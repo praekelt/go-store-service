@@ -3,43 +3,10 @@
 
 import json
 
-from zope.interface import Interface, implementer
 from cyclone.web import RequestHandler, Application, URLSpec
-from twisted.internet.deferred import maybeDeferred, inlineCallbacks
+from twisted.internet.defer import maybeDeferred, inlineCallbacks
 
-
-class ICollection(Interface):
-    """
-    An interface to a collection of objects.
-    """
-
-    def all():
-        """
-        An iterable over all objects in the collection. The iterable
-        may contain deferreds instead of objects.
-        """
-
-    def get(object_id):
-        """
-        Return a single object from the collection. May return a
-        deferred instead of the object.
-        """
-
-    def create(data):
-        """
-        Create an object within the collection. May return a
-        deferred.
-        """
-
-    def update(object_id, data):
-        """
-        Update an objected. May return a deferred.
-        """
-
-    def delete(object_id):
-        """
-        Delete an objected. May return a deferred.
-        """
+from go_store_service.collections import StoreCollection, RowCollection
 
 
 class CollectionHandler(RequestHandler):
@@ -126,17 +93,38 @@ class ElementHandler(RequestHandler):
         return self.collection.delete(self.elem_id)
 
 
+def create_urlspec_regex(dfn, *args, **kw):
+    """Create a URLSpec regex from a friendlier definition.
+
+    Friendlier definitions look like:
+
+      /foo/:var/baz/:other_var
+
+    Generated regular expresions look like::
+
+      /foo/(?P<var>[^/]*)/baz/(?P<other_var>[^/]*)
+    """
+    def replace_part(part):
+        if not part.startswith(':'):
+            return part
+        name = part.lstrip(":")
+        return "(?P<%s>[^/]*)" % (name,)
+
+    parts = dfn.split("/")
+    parts = [replace_part(p) for p in parts]
+    return "/".join(parts)
+
+
 class ApiApplication(Application):
     """
     An API for a set of collections and adhoc additional methods.
     """
 
     collections = ()
-    extra_routes = ()
 
-    def __init__(self):
+    def __init__(self, *args, **kw):
         routes = self._build_routes()
-        Application.__init__(self, routes)
+        Application.__init__(self, routes, *args, **kw)
 
     def _build_routes(self):
         """
@@ -144,47 +132,20 @@ class ApiApplication(Application):
         extra routes.
         """
         routes = []
-        for url_spec, cls in self.collections:
+        for dfn, collection_factory in self.collections:
             routes.extend((
-                URLSpec(url_spec, CollectionTopHandler, cls),
-                URLSpec(url_spec + '/:elem_id', CollectionElemHandler, cls),
+                URLSpec(create_urlspec_regex(dfn), CollectionHandler,
+                        kwargs={"collection_factory": collection_factory}),
+                URLSpec(create_urlspec_regex(dfn + '/:elem_id'),
+                        ElementHandler,
+                        kwargs={"collection_factory": collection_factory}),
             ))
-
-        for stuff in self.extra_routes:
-            # TODO: implement
-            pass
         return routes
-
-
-@implementer(ICollection)
-class StoreCollection(object):
-    """
-    A collection of stores belonging to an owner.
-    """
-
-    def __init__(self, owner_id):
-        self.owner_id = owner_id
-
-
-@implementer(ICollection)
-class RowCollection(object):
-    """
-    A table of rows belonging to a store.
-    """
-
-    def __init__(self, owner_id, store_id):
-        self.owner_id = owner_id
-        self.store_id = store_id
 
 
 class StoreApi(ApiApplication):
 
     collections = (
         ('/:owner/stores', StoreCollection),
-        ('/:owner/stores/:store_id', RowCollection),
-    )
-
-    extra_routes = (
-        ('/:owner/upload/:store_id', UploadHandler),
-        ('/:owner/search/:store_id', SearchHandler),
+        ('/:owner/stores/:store_id/keys', RowCollection),
     )
