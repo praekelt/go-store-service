@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 from go_store_service.api_handler import (
-    ApiApplication, create_urlspec_regex, CollectionHandler,
+    ApiApplication, StoreApi, create_urlspec_regex, CollectionHandler,
     ElementHandler)
 
 
@@ -49,3 +49,14 @@ class TestApiApplication(TestCase):
         self.assertEqual(elem_route.kwargs, {
             "collection_factory": collection_factory,
         })
+
+
+class TestStoreApi(TestCase):
+    def test_collections(self):
+        store_collection_factory = lambda **kw: "store_collection"
+        row_collection_factory = lambda **kw: "row_collection"
+        api = StoreApi(store_collection_factory, row_collection_factory)
+        self.assertEqual(api.collections, (
+            ("/:owner_id/stores", store_collection_factory),
+            ("/:owner_id/stores/:store_id/keys", row_collection_factory),
+        ))

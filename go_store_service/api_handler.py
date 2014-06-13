@@ -145,7 +145,14 @@ class ApiApplication(Application):
 
 class StoreApi(ApiApplication):
 
-    collections = (
-        ('/:owner/stores', StoreCollection),
-        ('/:owner/stores/:store_id/keys', RowCollection),
-    )
+    def __init__(self, store_collection_factory, row_collection_factory):
+        self.store_collection_factory = store_collection_factory
+        self.row_collection_factory = row_collection_factory
+        ApiApplication.__init__(self)
+
+    @property
+    def collections(self):
+        return (
+            ('/:owner_id/stores', self.store_collection_factory),
+            ('/:owner_id/stores/:store_id/keys', self.row_collection_factory),
+        )
