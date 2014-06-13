@@ -18,6 +18,16 @@ class TestCreateUrlspecRegex(TestCase):
             create_urlspec_regex("/:foo/bar/:baz"),
             "/(?P<foo>[^/]*)/bar/(?P<baz>[^/]*)")
 
+    def test_trailing_slash(self):
+        self.assertEqual(
+            create_urlspec_regex("/foo/bar/"), "/foo/bar/")
+
+    def test_no_slash(self):
+        self.assertEqual(create_urlspec_regex("foo"), "foo")
+
+    def test_standalone_slash(self):
+        self.assertEqual(create_urlspec_regex("/"), "/")
+
 
 class TestApiApplication(TestCase):
     def test_build_routes(self):
