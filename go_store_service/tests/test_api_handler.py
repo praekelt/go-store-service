@@ -9,6 +9,15 @@ class TestCreateUrlspecRegex(TestCase):
     def test_no_variables(self):
         self.assertEqual(create_urlspec_regex("/foo/bar"), "/foo/bar")
 
+    def test_one_variable(self):
+        self.assertEqual(
+            create_urlspec_regex("/:foo/bar"), "/(?P<foo>[^/]*)/bar")
+
+    def test_two_variables(self):
+        self.assertEqual(
+            create_urlspec_regex("/:foo/bar/:baz"),
+            "/(?P<foo>[^/]*)/bar/(?P<baz>[^/]*)")
+
 
 class TestApiApplication(TestCase):
     def test_build_routes(self):
