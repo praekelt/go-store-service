@@ -51,12 +51,18 @@ class TestApiApplication(TestCase):
         })
 
 
+class DummyBackend(object):
+    pass
+
+
 class TestStoreApi(TestCase):
     def test_collections(self):
-        store_collection_factory = lambda **kw: "store_collection"
-        row_collection_factory = lambda **kw: "row_collection"
-        api = StoreApi(store_collection_factory, row_collection_factory)
+        backend = DummyBackend()
+        backend.get_store_collection = lambda owner_id: "store_collection"
+        backend.get_row_collection = (
+            lambda owner_id, store_id: "row_collection")
+        api = StoreApi(backend)
         self.assertEqual(api.collections, (
-            ("/:owner_id/stores", store_collection_factory),
-            ("/:owner_id/stores/:store_id/keys", row_collection_factory),
+            ("/:owner_id/stores", backend.get_store_collection),
+            ("/:owner_id/stores/:store_id/keys", backend.get_row_collection),
         ))

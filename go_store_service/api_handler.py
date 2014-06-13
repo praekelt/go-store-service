@@ -144,15 +144,21 @@ class ApiApplication(Application):
 
 
 class StoreApi(ApiApplication):
+    """
+    :param IBackend backend:
+        A backend that provides a store collection factory and a row
+        collection factory.
+    """
 
-    def __init__(self, store_collection_factory, row_collection_factory):
-        self.store_collection_factory = store_collection_factory
-        self.row_collection_factory = row_collection_factory
+    def __init__(self, backend):
+        self.backend = backend
         ApiApplication.__init__(self)
 
     @property
     def collections(self):
         return (
-            ('/:owner_id/stores', self.store_collection_factory),
-            ('/:owner_id/stores/:store_id/keys', self.row_collection_factory),
+            ('/:owner_id/stores',
+             self.backend.get_store_collection),
+            ('/:owner_id/stores/:store_id/keys',
+             self.backend.get_row_collection),
         )
