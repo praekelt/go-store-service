@@ -2,35 +2,70 @@ from unittest import TestCase
 
 from zope.interface.verify import verifyObject
 
-from go_store_service.api_handler import StoreCollection, RowCollection
-from go_store_service.interfaces import ICollection
+from go_store_service.collections import (
+    InMemoryCollectionBackend, RiakCollectionBackend)
+from go_store_service.interfaces import ICollection, IStoreBackend
 
 
-class TestStoreCollection(TestCase):
+class CommonStoreTests(object):
+    """
+    Tests to run for all store implementations.
+    """
 
-    def test_has_owner_id(self):
+    def get_store_backend(self):
         """
-        A StoreCollection should know who owns it.
+        This must be overridden in subclasses to return a store backend object.
         """
-        stores = StoreCollection("me")
-        self.assertEqual(stores.owner_id, "me")
+        raise NotImplementedError()
 
-    def test_implements_ICollection(self):
+    ##############################################
+    # Tests for backend functionality.
+
+    def test_store_backend_provides_IStoreBackend(self):
         """
-        StoreCollection implements the ICollection interface.
+        The store backend provides IStoreBackend.
         """
-        verifyObject(ICollection, StoreCollection("me"))
+        backend = self.get_store_backend()
+        verifyObject(IStoreBackend, backend)
 
-
-class TestRowCollection(TestCase):
-
-    def test_create(self):
-        rows = RowCollection("me", "my_store")
-        self.assertEqual(rows.owner_id, "me")
-        self.assertEqual(rows.store_id, "my_store")
-
-    def test_implements_ICollection(self):
+    def test_store_collection_provides_ICollection(self):
         """
-        RowCollection implements the ICollection interface.
+        The return value of .get_store_collection() is an object that provides
+        ICollection.
         """
-        verifyObject(ICollection, RowCollection("me", "my_store"))
+        backend = self.get_store_backend()
+        stores = backend.get_store_collection("me")
+        verifyObject(ICollection, stores)
+
+    def test_row_collection_provides_ICollection(self):
+        """
+        The return value of .get_row_collection() is an object that provides
+        ICollection.
+        """
+        backend = self.get_store_backend()
+        rows = backend.get_row_collection("me", "my_store")
+        verifyObject(ICollection, rows)
+
+    ##############################################
+    # Tests for store collection functionality.
+
+    def test_stores_collection_all_empty(self):
+        """
+        Listing all stores returns an empty list when no stores exist.
+        """
+        backend = self.get_store_backend()
+        stores = backend.get_store_collection("me")
+        self.assertEqual(stores.all(), [])
+
+    ##############################################
+    # Tests for row collection functionality.
+
+
+class TestInMemoryStore(TestCase, CommonStoreTests):
+    def get_store_backend(self):
+        return InMemoryCollectionBackend({})
+
+
+class TestRiakStore(TestCase, CommonStoreTests):
+    def get_store_backend(self):
+        return RiakCollectionBackend({})

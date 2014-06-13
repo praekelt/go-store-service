@@ -33,3 +33,19 @@ class ICollection(Interface):
         """
         Delete an object. May return a deferred.
         """
+
+
+class IStoreBackend(Interface):
+    """
+    An interface for a backend datastore.
+    """
+
+    def get_store_collection(owner_id):
+        """
+        Returns an ICollection provider containing a collection of stores.
+        """
+
+    def get_row_collection(owner_id, store_id):
+        """
+        Returns an ICollection provider containing a collection of rows.
+        """
