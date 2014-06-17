@@ -6,8 +6,6 @@ import json
 from cyclone.web import RequestHandler, Application, URLSpec
 from twisted.internet.defer import maybeDeferred, inlineCallbacks
 
-from go_store_service.collections import StoreCollection, RowCollection
-
 
 class CollectionHandler(RequestHandler):
     """
