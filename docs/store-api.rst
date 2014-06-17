@@ -143,6 +143,8 @@ API methods
 Random notes
 ------------
 
+::
+
     * ``GET /:owner/stores`` - list all stores
 
     * ``GET /:owner/stores/:store_id`` - fetch a store

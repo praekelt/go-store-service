@@ -1,3 +1,6 @@
+from uuid import uuid4
+
+from twisted.internet.defer import Deferred
 from zope.interface import implementer
 
 from go_store_service.interfaces import ICollection, IStoreBackend
@@ -72,6 +75,14 @@ class RiakCollectionBackend(object):
         return RowCollection(self, owner_id, store_id)
 
 
+def defer_async(value, reactor=None):
+    if reactor is None:
+        from twisted.internet import reactor
+    d = Deferred()
+    reactor.callLater(0, lambda: d.callback(value))
+    return d
+
+
 @implementer(ICollection)
 class InMemoryStoreCollection(object):
     """
@@ -79,24 +90,33 @@ class InMemoryStoreCollection(object):
     Forgets things easily.
     """
 
-    def __init__(self, backend, owner_id):
+    def __init__(self, backend, owner_id, reactor=None):
         self._backend = backend
         self.owner_id = owner_id
+        self.reactor = reactor
+
+    def _defer(self, value):
+        return defer_async(value, self.reactor)
 
     def all(self):
-        return self._backend.stores.keys()
+        return self._defer(self._backend.stores.keys())
 
     def get(self, object_id):
-        return self._backend.stores[object_id].copy()
+        return self._defer(self._backend.stores[object_id].copy())
 
     def create(self, data):
-        pass
+        key = uuid4().hex
+        assert 'id' not in data
+        self._backend.stores[key] = data.copy()
+        self._backend.stores[key]['id'] = key
+        return self._defer(key)
 
     def update(self, object_id, data):
-        pass
+        raise NotImplementedError()
 
     def delete(self, object_id):
-        pass
+        # TODO: Something about row data?
+        return self._defer(self._backend.stores.pop(object_id, None))
 
 
 @implementer(ICollection)
