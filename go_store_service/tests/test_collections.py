@@ -125,19 +125,35 @@ class CommonStoreTests(object):
 
     @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
-    def test_stores_collection_create_no_data(self):
+    def test_stores_collection_create_no_id_no_data(self):
+        """
+        Creating an object with no object_id should generate one.
+        """
         stores = yield self.get_empty_store_collection()
 
-        store_key = yield stores.create({})
+        store_key = yield stores.create(None, {})
         store_data = yield stores.get(store_key)
         self.assertEqual(store_data, {'id': store_key})
 
     @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
-    def test_stores_collection_create_with_data(self):
+    def test_stores_collection_create_with_id_no_data(self):
+        """
+        Creating an object with an object_id should not generate a new one.
+        """
         stores = yield self.get_empty_store_collection()
 
-        store_key = yield stores.create({'foo': 'bar'})
+        store_key = yield stores.create('key', {})
+        self.assertEqual(store_key, 'key')
+        store_data = yield stores.get(store_key)
+        self.assertEqual(store_data, {'id': 'key'})
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_stores_collection_create_no_id_with_data(self):
+        stores = yield self.get_empty_store_collection()
+
+        store_key = yield stores.create(None, {'foo': 'bar'})
         store_keys = yield stores.all()
         self.assertEqual(store_keys, [store_key])
         store_data = yield stores.get(store_key)
@@ -157,7 +173,7 @@ class CommonStoreTests(object):
     @inlineCallbacks
     def test_stores_collection_delete_existing_store(self):
         stores = yield self.get_empty_store_collection()
-        store_key = yield stores.create({})
+        store_key = yield stores.create(None, {})
         store_keys = yield stores.all()
         self.ensure_equal(store_keys, [store_key])
 
@@ -165,6 +181,20 @@ class CommonStoreTests(object):
         self.assertEqual(store_data, {'id': store_key})
         store_keys = yield stores.all()
         self.assertEqual(store_keys, [])
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_stores_collection_update(self):
+        stores = yield self.get_empty_store_collection()
+        store_key = yield stores.create(None, {})
+        store_data = yield stores.get(store_key)
+        self.ensure_equal(store_data, {'id': store_key})
+
+        store_data = yield stores.update(
+            store_key, {'id': store_key, 'foo': 'bar'})
+        self.assertEqual(store_data, {'id': store_key, 'foo': 'bar'})
+        store_data = yield stores.get(store_key)
+        self.assertEqual(store_data, {'id': store_key, 'foo': 'bar'})
 
     ##############################################
     # Tests for row collection functionality.

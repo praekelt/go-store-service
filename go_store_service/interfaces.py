@@ -8,25 +8,28 @@ class ICollection(Interface):
 
     def all():
         """
-        An iterable over all objects in the collection. The iterable
-        may contain deferreds instead of objects.
+        Return an iterable over all objects in the collection. The iterable may
+        contain deferreds instead of objects.
         """
 
     def get(object_id):
         """
-        Return a single object from the collection. May return a
-        deferred instead of the object.
+        Return a single object from the collection. May return a deferred
+        instead of the object.
         """
 
-    def create(data):
+    def create(object_id, data):
         """
-        Create an object within the collection. May return a
-        deferred.
+        Create an object within the collection. May return a deferred.
+
+        If ``object_id`` is ``None``, an identifier will be generated.
         """
 
     def update(object_id, data):
         """
         Update an object. May return a deferred.
+
+        ``object_id`` may not be ``None``.
         """
 
     def delete(object_id):

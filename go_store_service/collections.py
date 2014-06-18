@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 
 from twisted.internet.defer import Deferred
@@ -24,7 +25,7 @@ class StoreCollection(object):
             "id": object_id,
         }
 
-    def create(self, data):
+    def create(self, object_id, data):
         pass
 
     def update(self, object_id, data):
@@ -53,7 +54,7 @@ class RowCollection(object):
             "id": object_id,
         }
 
-    def create(self, data):
+    def create(self, object_id, data):
         pass
 
     def update(self, object_id, data):
@@ -98,25 +99,41 @@ class InMemoryStoreCollection(object):
     def _defer(self, value):
         return defer_async(value, self.reactor)
 
+    def _set_data(self, object_id, data):
+        store_data = data.copy()
+        store_data['id'] = object_id
+        self._backend.stores[object_id] = json.dumps(store_data)
+
+    def _get_data(self, object_id):
+        data = self._backend.stores.get(object_id, None)
+        if data is not None:
+            data = json.loads(data)
+        return data
+
     def all(self):
         return self._defer(self._backend.stores.keys())
 
     def get(self, object_id):
-        return self._defer(self._backend.stores[object_id].copy())
+        return self._defer(self._get_data(object_id))
 
-    def create(self, data):
-        key = uuid4().hex
-        assert 'id' not in data
-        self._backend.stores[key] = data.copy()
-        self._backend.stores[key]['id'] = key
-        return self._defer(key)
+    def create(self, object_id, data):
+        if object_id is None:
+            object_id = uuid4().hex
+        assert 'id' not in data  # TODO: Something better than assert.
+        self._set_data(object_id, data)
+        return self._defer(object_id)
 
     def update(self, object_id, data):
-        raise NotImplementedError()
+        assert object_id is not None  # TODO: Something better than assert.
+        assert object_id in self._backend.stores
+        self._set_data(object_id, data)
+        return self._defer(self._get_data(object_id))
 
     def delete(self, object_id):
         # TODO: Something about row data?
-        return self._defer(self._backend.stores.pop(object_id, None))
+        data = self._get_data(object_id)
+        self._backend.stores.pop(object_id, None)
+        return self._defer(data)
 
 
 @implementer(ICollection)
@@ -139,7 +156,7 @@ class InMemoryRowCollection(object):
             "id": object_id,
         }
 
-    def create(self, data):
+    def create(self, object_id, data):
         pass
 
     def update(self, object_id, data):
