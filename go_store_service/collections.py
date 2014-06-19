@@ -1,10 +1,16 @@
 import json
 from uuid import uuid4
 
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import Deferred, inlineCallbacks, returnValue
+from vumi.persist.fields import Json
+from vumi.persist.model import Model
 from zope.interface import implementer
 
 from go_store_service.interfaces import ICollection, IStoreBackend
+
+
+class StoreData(Model):
+    data = Json(default={})
 
 
 @implementer(ICollection)
@@ -16,23 +22,44 @@ class StoreCollection(object):
     def __init__(self, backend, owner_id):
         self._backend = backend
         self.owner_id = owner_id
+        self._stores = backend.manager.proxy(StoreData)
 
     def all(self):
-        return []
+        return self._stores.all_keys()
 
     def get(self, object_id):
-        return {
-            "id": object_id,
-        }
+        d = self._stores.load(object_id)
+        d.addCallback(lambda sm: sm.data if sm is not None else None)
+        return d
 
     def create(self, object_id, data):
-        pass
+        assert 'id' not in data  # TODO: Something better than assert.
+        if object_id is None:
+            object_id = uuid4().hex
+        store_model = self._stores(object_id, data=data.copy())
+        store_model.data['id'] = object_id
+        d = store_model.save()
+        d.addCallback(lambda _: object_id)
+        return d
 
+    @inlineCallbacks
     def update(self, object_id, data):
-        pass
+        assert object_id is not None  # TODO: Something better than assert.
+        obj = yield self._stores.load(object_id)
+        assert obj is not None  # TODO: Something better than assert.
+        obj.data = data.copy()
+        obj.data['id'] = object_id
+        yield obj.save()
+        returnValue(obj.data)
 
+    @inlineCallbacks
     def delete(self, object_id):
-        pass
+        store_model = yield self._stores.load(object_id)
+        if store_model is None:
+            returnValue(None)
+        store_data = store_model.data
+        yield store_model.delete()
+        returnValue(store_data)
 
 
 @implementer(ICollection)
@@ -47,27 +74,25 @@ class RowCollection(object):
         self.store_id = store_id
 
     def all(self):
-        return []
+        raise NotImplementedError()
 
     def get(self, object_id):
-        return {
-            "id": object_id,
-        }
+        raise NotImplementedError()
 
     def create(self, object_id, data):
-        pass
+        raise NotImplementedError()
 
     def update(self, object_id, data):
-        pass
+        raise NotImplementedError()
 
     def delete(self, object_id):
-        pass
+        raise NotImplementedError()
 
 
 @implementer(IStoreBackend)
 class RiakCollectionBackend(object):
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, manager):
+        self.manager = manager
 
     def get_store_collection(self, owner_id):
         return StoreCollection(self, owner_id)
@@ -178,9 +203,9 @@ class InMemoryRowCollection(object):
         return self._defer(self._get_data(object_id))
 
     def create(self, object_id, data):
+        assert 'id' not in data  # TODO: Something better than assert.
         if object_id is None:
             object_id = uuid4().hex
-        assert 'id' not in data  # TODO: Something better than assert.
         self._set_data(object_id, data)
         return self._defer(object_id)
 

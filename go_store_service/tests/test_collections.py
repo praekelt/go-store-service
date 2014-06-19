@@ -1,8 +1,9 @@
 from functools import wraps
 
-from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import inlineCallbacks, returnValue, gatherResults
 from twisted.internet.task import Clock
 from twisted.trial.unittest import TestCase, SkipTest
+from vumi.tests.helpers import VumiTestCase, PersistenceHelper
 from zope.interface.verify import verifyObject
 
 from go_store_service.collections import (
@@ -47,6 +48,14 @@ class CommonStoreTests(object):
         if type(backend) in getattr(self, 'skip_for_backends', ()):
             raise SkipTest("Skipped for %s" % (type(backend),))
         return backend
+
+    def filtered_all(self, collection):
+        """
+        Some backends may have some index deletion lag, so we might need to
+        filter the results. This implementation doesn't do any filtering, but
+        subclasses can override.
+        """
+        return collection.all()
 
     def ensure_equal(self, foo, bar, msg=None):
         """
@@ -104,14 +113,13 @@ class CommonStoreTests(object):
         """
         backend = self.get_store_backend()
         stores = yield backend.get_store_collection(owner)
-        keys = yield stores.all()
+        keys = yield self.filtered_all(stores)
         self.ensure_equal(
             keys, [],
             "Expected empty store collection for %r, got keys: %r" % (
                 owner, keys))
         returnValue(stores)
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_store_collection_all_empty(self):
         """
@@ -120,10 +128,9 @@ class CommonStoreTests(object):
         backend = self.get_store_backend()
         stores = yield backend.get_store_collection("me")
 
-        store_keys = yield stores.all()
+        store_keys = yield self.filtered_all(stores)
         self.assertEqual(store_keys, [])
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_store_collection_create_no_id_no_data(self):
         """
@@ -135,7 +142,6 @@ class CommonStoreTests(object):
         store_data = yield stores.get(store_key)
         self.assertEqual(store_data, {'id': store_key})
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_store_collection_create_with_id_no_data(self):
         """
@@ -148,41 +154,39 @@ class CommonStoreTests(object):
         store_data = yield stores.get(store_key)
         self.assertEqual(store_data, {'id': 'key'})
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_store_collection_create_no_id_with_data(self):
         stores = yield self.get_empty_store_collection()
 
         store_key = yield stores.create(None, {'foo': 'bar'})
-        store_keys = yield stores.all()
+        store_keys = yield self.filtered_all(stores)
         self.assertEqual(store_keys, [store_key])
         store_data = yield stores.get(store_key)
         self.assertEqual(store_data, {'foo': 'bar', 'id': store_key})
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_store_collection_delete_missing_store(self):
         stores = yield self.get_empty_store_collection()
 
         store_data = yield stores.delete('foo')
         self.assertEqual(store_data, None)
-        store_keys = yield stores.all()
+        store_keys = yield self.filtered_all(stores)
         self.assertEqual(store_keys, [])
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_store_collection_delete_existing_store(self):
         stores = yield self.get_empty_store_collection()
         store_key = yield stores.create(None, {})
-        store_keys = yield stores.all()
+        store_keys = yield self.filtered_all(stores)
         self.ensure_equal(store_keys, [store_key])
 
         store_data = yield stores.delete(store_key)
         self.assertEqual(store_data, {'id': store_key})
-        store_keys = yield stores.all()
+        store_data = yield stores.get(store_key)
+        self.assertEqual(store_data, None)
+        store_keys = yield self.filtered_all(stores)
         self.assertEqual(store_keys, [])
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_store_collection_update(self):
         stores = yield self.get_empty_store_collection()
@@ -209,7 +213,7 @@ class CommonStoreTests(object):
         """
         backend = self.get_store_backend()
         rows = yield backend.get_row_collection(owner_id, store_id)
-        keys = yield rows.all()
+        keys = yield self.filtered_all(rows)
         self.ensure_equal(
             keys, [],
             "Expected empty row collection for %r:%r, got keys: %r" % (
@@ -225,7 +229,7 @@ class CommonStoreTests(object):
         backend = self.get_store_backend()
         rows = yield backend.get_row_collection("me", "store")
 
-        row_keys = yield rows.all()
+        row_keys = yield self.filtered_all(rows)
         self.assertEqual(row_keys, [])
 
     @skip_for_backend(RiakCollectionBackend)
@@ -240,7 +244,7 @@ class CommonStoreTests(object):
         other_rows = yield backend.get_row_collection("me", "other_store")
         yield other_rows.create(None, {})
 
-        row_keys = yield rows.all()
+        row_keys = yield self.filtered_all(rows)
         self.assertEqual(row_keys, [])
 
     @skip_for_backend(RiakCollectionBackend)
@@ -274,7 +278,7 @@ class CommonStoreTests(object):
         rows = yield self.get_empty_row_collection()
 
         row_key = yield rows.create(None, {'foo': 'bar'})
-        row_keys = yield rows.all()
+        row_keys = yield self.filtered_all(rows)
         self.assertEqual(row_keys, [row_key])
         row_data = yield rows.get(row_key)
         self.assertEqual(row_data, {'foo': 'bar', 'id': row_key})
@@ -286,7 +290,7 @@ class CommonStoreTests(object):
 
         row_data = yield rows.delete('foo')
         self.assertEqual(row_data, None)
-        row_keys = yield rows.all()
+        row_keys = yield self.filtered_all(rows)
         self.assertEqual(row_keys, [])
 
     @skip_for_backend(RiakCollectionBackend)
@@ -294,12 +298,12 @@ class CommonStoreTests(object):
     def test_row_collection_delete_existing_row(self):
         rows = yield self.get_empty_row_collection()
         row_key = yield rows.create(None, {})
-        row_keys = yield rows.all()
+        row_keys = yield self.filtered_all(rows)
         self.ensure_equal(row_keys, [row_key])
 
         row_data = yield rows.delete(row_key)
         self.assertEqual(row_data, {'id': row_key})
-        row_keys = yield rows.all()
+        row_keys = yield self.filtered_all(rows)
         self.assertEqual(row_keys, [])
 
     @skip_for_backend(RiakCollectionBackend)
@@ -330,6 +334,33 @@ class TestInMemoryStore(TestCase, CommonStoreTests):
         self.assertEqual(d.result, 'foo')
 
 
-class TestRiakStore(TestCase, CommonStoreTests):
+class TestRiakStore(VumiTestCase, CommonStoreTests):
+    def setUp(self):
+        self.persistence_helper = self.add_helper(
+            PersistenceHelper(use_riak=True))
+        self.manager = self.persistence_helper.get_riak_manager()
+
     def make_store_backend(self):
-        return RiakCollectionBackend({})
+        return RiakCollectionBackend(self.manager)
+
+    @inlineCallbacks
+    def filtered_all(self, collection):
+        """
+        There's a delay (3s by default) between object deletion and tombstone
+        cleanup in Riak. Index entries only get removed after this, so we check
+        for the existence of each key and filter out any keys that have no
+        objects associated with them.
+
+        This means we're never actually checking that deleted objects get
+        removed from the return value of .all() but we can probably assume that
+        Riak indexes work properly.
+        """
+        keys = yield collection.all()
+
+        def check_key(key):
+            d = collection.get(key)
+            d.addCallback(lambda obj: None if obj is None else key)
+            return d
+
+        checked_keys = yield gatherResults([check_key(key) for key in keys])
+        returnValue([key for key in checked_keys if key is not None])
