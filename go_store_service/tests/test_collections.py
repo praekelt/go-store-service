@@ -113,7 +113,7 @@ class CommonStoreTests(object):
 
     @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
-    def test_stores_collection_all_empty(self):
+    def test_store_collection_all_empty(self):
         """
         Listing all stores returns an empty list when no stores exist.
         """
@@ -125,7 +125,7 @@ class CommonStoreTests(object):
 
     @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
-    def test_stores_collection_create_no_id_no_data(self):
+    def test_store_collection_create_no_id_no_data(self):
         """
         Creating an object with no object_id should generate one.
         """
@@ -137,7 +137,7 @@ class CommonStoreTests(object):
 
     @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
-    def test_stores_collection_create_with_id_no_data(self):
+    def test_store_collection_create_with_id_no_data(self):
         """
         Creating an object with an object_id should not generate a new one.
         """
@@ -150,7 +150,7 @@ class CommonStoreTests(object):
 
     @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
-    def test_stores_collection_create_no_id_with_data(self):
+    def test_store_collection_create_no_id_with_data(self):
         stores = yield self.get_empty_store_collection()
 
         store_key = yield stores.create(None, {'foo': 'bar'})
@@ -161,7 +161,7 @@ class CommonStoreTests(object):
 
     @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
-    def test_stores_collection_delete_missing_store(self):
+    def test_store_collection_delete_missing_store(self):
         stores = yield self.get_empty_store_collection()
 
         store_data = yield stores.delete('foo')
@@ -171,7 +171,7 @@ class CommonStoreTests(object):
 
     @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
-    def test_stores_collection_delete_existing_store(self):
+    def test_store_collection_delete_existing_store(self):
         stores = yield self.get_empty_store_collection()
         store_key = yield stores.create(None, {})
         store_keys = yield stores.all()
@@ -184,7 +184,7 @@ class CommonStoreTests(object):
 
     @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
-    def test_stores_collection_update(self):
+    def test_store_collection_update(self):
         stores = yield self.get_empty_store_collection()
         store_key = yield stores.create(None, {})
         store_data = yield stores.get(store_key)
@@ -198,6 +198,123 @@ class CommonStoreTests(object):
 
     ##############################################
     # Tests for row collection functionality.
+
+    @inlineCallbacks
+    def get_empty_row_collection(self, owner_id="me", store_id="store"):
+        """
+        Return a row collection after ensuring that it is empty.
+
+        This raises an exception rather than a failure because it's not part of
+        the intended test assertions.
+        """
+        backend = self.get_store_backend()
+        rows = yield backend.get_row_collection(owner_id, store_id)
+        keys = yield rows.all()
+        self.ensure_equal(
+            keys, [],
+            "Expected empty row collection for %r:%r, got keys: %r" % (
+                owner_id, store_id, keys))
+        returnValue(rows)
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_row_collection_all_empty(self):
+        """
+        Listing all rows returns an empty list when no rows exist in the store.
+        """
+        backend = self.get_store_backend()
+        rows = yield backend.get_row_collection("me", "store")
+
+        row_keys = yield rows.all()
+        self.assertEqual(row_keys, [])
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_row_collection_all_empty_rows_in_other_store(self):
+        """
+        Listing all rows returns an empty list when no rows exist in the store,
+        even when rows exist in other stores.
+        """
+        backend = self.get_store_backend()
+        rows = yield backend.get_row_collection("me", "store")
+        other_rows = yield backend.get_row_collection("me", "other_store")
+        yield other_rows.create(None, {})
+
+        row_keys = yield rows.all()
+        self.assertEqual(row_keys, [])
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_row_collection_create_no_id_no_data(self):
+        """
+        Creating an object with no object_id should generate one.
+        """
+        rows = yield self.get_empty_row_collection()
+
+        row_key = yield rows.create(None, {})
+        row_data = yield rows.get(row_key)
+        self.assertEqual(row_data, {'id': row_key})
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_row_collection_create_with_id_no_data(self):
+        """
+        Creating an object with an object_id should not generate a new one.
+        """
+        rows = yield self.get_empty_row_collection()
+
+        row_key = yield rows.create('key', {})
+        self.assertEqual(row_key, 'key')
+        row_data = yield rows.get(row_key)
+        self.assertEqual(row_data, {'id': 'key'})
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_row_collection_create_no_id_with_data(self):
+        rows = yield self.get_empty_row_collection()
+
+        row_key = yield rows.create(None, {'foo': 'bar'})
+        row_keys = yield rows.all()
+        self.assertEqual(row_keys, [row_key])
+        row_data = yield rows.get(row_key)
+        self.assertEqual(row_data, {'foo': 'bar', 'id': row_key})
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_row_collection_delete_missing_row(self):
+        rows = yield self.get_empty_row_collection()
+
+        row_data = yield rows.delete('foo')
+        self.assertEqual(row_data, None)
+        row_keys = yield rows.all()
+        self.assertEqual(row_keys, [])
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_row_collection_delete_existing_row(self):
+        rows = yield self.get_empty_row_collection()
+        row_key = yield rows.create(None, {})
+        row_keys = yield rows.all()
+        self.ensure_equal(row_keys, [row_key])
+
+        row_data = yield rows.delete(row_key)
+        self.assertEqual(row_data, {'id': row_key})
+        row_keys = yield rows.all()
+        self.assertEqual(row_keys, [])
+
+    @skip_for_backend(RiakCollectionBackend)
+    @inlineCallbacks
+    def test_row_collection_update(self):
+        rows = yield self.get_empty_row_collection()
+        row_key = yield rows.create(None, {})
+        row_data = yield rows.get(row_key)
+        self.ensure_equal(row_data, {'id': row_key})
+
+        row_data = yield rows.update(
+            row_key, {'id': row_key, 'foo': 'bar'})
+        self.assertEqual(row_data, {'id': row_key, 'foo': 'bar'})
+        row_data = yield rows.get(row_key)
+        self.assertEqual(row_data, {'id': row_key, 'foo': 'bar'})
 
 
 class TestInMemoryStore(TestCase, CommonStoreTests):
