@@ -1,10 +1,8 @@
 from unittest import TestCase
 
 from go_store_service.api_handler import (
-    ApiApplication, StoreApi, create_urlspec_regex, CollectionHandler,
-    ElementHandler)
-
-from go_store_service.collections import InMemoryCollectionBackend
+    CollectionHandler, ElementHandler,
+    create_urlspec_regex, ApiApplication)
 
 
 class TestCollectionHandler(TestCase):
@@ -59,13 +57,3 @@ class TestApiApplication(TestCase):
         self.assertEqual(elem_route.kwargs, {
             "collection_factory": collection_factory,
         })
-
-
-class TestStoreApi(TestCase):
-    def test_collections(self):
-        backend = InMemoryCollectionBackend({})
-        api = StoreApi(backend)
-        self.assertEqual(api.collections, (
-            ("/:owner_id/stores", backend.get_store_collection),
-            ("/:owner_id/stores/:store_id/keys", backend.get_row_collection),
-        ))

@@ -120,9 +120,9 @@ class ApiApplication(Application):
 
     collections = ()
 
-    def __init__(self, *args, **kw):
+    def __init__(self, **settings):
         routes = self._build_routes()
-        Application.__init__(self, routes, *args, **kw)
+        Application.__init__(self, routes, **settings)
 
     def _build_routes(self):
         """
@@ -139,24 +139,3 @@ class ApiApplication(Application):
                         kwargs={"collection_factory": collection_factory}),
             ))
         return routes
-
-
-class StoreApi(ApiApplication):
-    """
-    :param IBackend backend:
-        A backend that provides a store collection factory and a row
-        collection factory.
-    """
-
-    def __init__(self, backend):
-        self.backend = backend
-        ApiApplication.__init__(self)
-
-    @property
-    def collections(self):
-        return (
-            ('/:owner_id/stores',
-             self.backend.get_store_collection),
-            ('/:owner_id/stores/:store_id/keys',
-             self.backend.get_row_collection),
-        )
