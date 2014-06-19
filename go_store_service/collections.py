@@ -13,6 +13,10 @@ class StoreData(Model):
     data = Json(default={})
 
 
+class RowData(Model):
+    data = Json(default={})
+
+
 @implementer(ICollection)
 class StoreCollection(object):
     """
@@ -72,21 +76,57 @@ class RowCollection(object):
         self._backend = backend
         self.owner_id = owner_id
         self.store_id = store_id
+        self._rows = backend.manager.proxy(RowData)
+
+    def _key(self, object_id):
+        return '%s:%s' % (self.store_id, object_id)
+
+    def _keys_for_store(self, keys):
+        # This is a generator callback, it shouldn't have @inlineCallbacks.
+        for full_key in keys:
+            store_id, _sep, key = full_key.partition(':')
+            if store_id == self.store_id:
+                yield key
 
     def all(self):
-        raise NotImplementedError()
+        d = self._rows.all_keys()
+        d.addCallback(self._keys_for_store)
+        d.addCallback(list)
+        return d
 
     def get(self, object_id):
-        raise NotImplementedError()
+        d = self._rows.load(self._key(object_id))
+        d.addCallback(lambda sm: sm.data if sm is not None else None)
+        return d
 
     def create(self, object_id, data):
-        raise NotImplementedError()
+        assert 'id' not in data  # TODO: Something better than assert.
+        if object_id is None:
+            object_id = uuid4().hex
+        row_model = self._rows(self._key(object_id), data=data.copy())
+        row_model.data['id'] = object_id
+        d = row_model.save()
+        d.addCallback(lambda _: object_id)
+        return d
 
+    @inlineCallbacks
     def update(self, object_id, data):
-        raise NotImplementedError()
+        assert object_id is not None  # TODO: Something better than assert.
+        obj = yield self._rows.load(self._key(object_id))
+        assert obj is not None  # TODO: Something better than assert.
+        obj.data = data.copy()
+        obj.data['id'] = object_id
+        yield obj.save()
+        returnValue(obj.data)
 
+    @inlineCallbacks
     def delete(self, object_id):
-        raise NotImplementedError()
+        row_model = yield self._rows.load(self._key(object_id))
+        if row_model is None:
+            returnValue(None)
+        row_data = row_model.data
+        yield row_model.delete()
+        returnValue(row_data)
 
 
 @implementer(IStoreBackend)

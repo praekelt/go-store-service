@@ -220,7 +220,6 @@ class CommonStoreTests(object):
                 owner_id, store_id, keys))
         returnValue(rows)
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_row_collection_all_empty(self):
         """
@@ -232,7 +231,6 @@ class CommonStoreTests(object):
         row_keys = yield self.filtered_all(rows)
         self.assertEqual(row_keys, [])
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_row_collection_all_empty_rows_in_other_store(self):
         """
@@ -247,7 +245,6 @@ class CommonStoreTests(object):
         row_keys = yield self.filtered_all(rows)
         self.assertEqual(row_keys, [])
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_row_collection_create_no_id_no_data(self):
         """
@@ -259,7 +256,6 @@ class CommonStoreTests(object):
         row_data = yield rows.get(row_key)
         self.assertEqual(row_data, {'id': row_key})
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_row_collection_create_with_id_no_data(self):
         """
@@ -272,7 +268,6 @@ class CommonStoreTests(object):
         row_data = yield rows.get(row_key)
         self.assertEqual(row_data, {'id': 'key'})
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_row_collection_create_no_id_with_data(self):
         rows = yield self.get_empty_row_collection()
@@ -283,7 +278,6 @@ class CommonStoreTests(object):
         row_data = yield rows.get(row_key)
         self.assertEqual(row_data, {'foo': 'bar', 'id': row_key})
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_row_collection_delete_missing_row(self):
         rows = yield self.get_empty_row_collection()
@@ -293,7 +287,6 @@ class CommonStoreTests(object):
         row_keys = yield self.filtered_all(rows)
         self.assertEqual(row_keys, [])
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_row_collection_delete_existing_row(self):
         rows = yield self.get_empty_row_collection()
@@ -306,7 +299,6 @@ class CommonStoreTests(object):
         row_keys = yield self.filtered_all(rows)
         self.assertEqual(row_keys, [])
 
-    @skip_for_backend(RiakCollectionBackend)
     @inlineCallbacks
     def test_row_collection_update(self):
         rows = yield self.get_empty_row_collection()
