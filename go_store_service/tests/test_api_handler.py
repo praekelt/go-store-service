@@ -4,6 +4,16 @@ from go_store_service.api_handler import (
     ApiApplication, StoreApi, create_urlspec_regex, CollectionHandler,
     ElementHandler)
 
+from go_store_service.collections import InMemoryCollectionBackend
+
+
+class TestCollectionHandler(TestCase):
+    pass
+
+
+class TestElementHandler(TestCase):
+    pass
+
 
 class TestCreateUrlspecRegex(TestCase):
     def test_no_variables(self):
@@ -51,16 +61,9 @@ class TestApiApplication(TestCase):
         })
 
 
-class DummyBackend(object):
-    pass
-
-
 class TestStoreApi(TestCase):
     def test_collections(self):
-        backend = DummyBackend()
-        backend.get_store_collection = lambda owner_id: "store_collection"
-        backend.get_row_collection = (
-            lambda owner_id, store_id: "row_collection")
+        backend = InMemoryCollectionBackend({})
         api = StoreApi(backend)
         self.assertEqual(api.collections, (
             ("/:owner_id/stores", backend.get_store_collection),
