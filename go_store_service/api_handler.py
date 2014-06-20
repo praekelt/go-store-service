@@ -49,7 +49,8 @@ class CollectionHandler(RequestHandler):
             obj = yield obj_deferred
             if obj is None:
                 continue
-            yield self._write_obj(obj)
+            yield self._write_object(obj)
+            self.write("\n")
 
     def get(self, *args, **kw):
         """

@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 from unittest import TestCase
 
@@ -79,6 +80,15 @@ class TestCollectionHandler(TestCase):
         return CollectionHandler(
             app, request, collection_factory=collection_factory)
 
+    def assert_written(self, handler, expected):
+        data = "".join(handler._write_buffer)
+        lines = data.splitlines()
+        objs = [json.loads(l) for l in lines]
+        self.assertEqual(objs, expected)
+
+    def handler_data(self, handler):
+        return "".join(handler._write_buffer)
+
     def test_initialize(self):
         handler = self.mk_handler()
         self.assertEqual(handler.collection_factory(), self.collection)
@@ -92,10 +102,18 @@ class TestCollectionHandler(TestCase):
         pass
 
     def test_write_object(self):
-        pass
+        handler = self.mk_handler()
+        handler._write_object({"id": "foo"})
+        self.assert_written(handler, [{"id": "foo"}])
 
     def test_write_objects(self):
-        pass
+        handler = self.mk_handler()
+        handler._write_objects([
+            {"id": "obj1"}, {"id": "obj2"},
+        ])
+        self.assert_written(handler, [
+            {"id": "obj1"}, {"id": "obj2"},
+        ])
 
     def test_get(self):
         pass
