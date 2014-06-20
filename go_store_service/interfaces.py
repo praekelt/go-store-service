@@ -6,10 +6,17 @@ class ICollection(Interface):
     An interface to a collection of objects.
     """
 
+    def all_keys():
+        """
+        Return an iterable over all keys in the collection. May return a
+        deferred instead of the iterable.
+        """
+
     def all():
         """
         Return an iterable over all objects in the collection. The iterable may
-        contain deferreds instead of objects.
+        contain deferreds instead of objects. May return a deferred instead of
+        the iterable.
         """
 
     def get(object_id):

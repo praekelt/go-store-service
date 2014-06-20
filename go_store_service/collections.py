@@ -28,8 +28,17 @@ class StoreCollection(object):
         self.owner_id = owner_id
         self._stores = backend.manager.proxy(StoreData)
 
-    def all(self):
+    def all_keys(self):
         return self._stores.all_keys()
+
+    def _all_iterator(self, keys):
+        for key in keys:
+            yield self.get(key)
+
+    def all(self):
+        d = self.all_keys()
+        d.addCallback(self._all_iterator)
+        return d
 
     def get(self, object_id):
         d = self._stores.load(object_id)
@@ -88,10 +97,19 @@ class RowCollection(object):
             if store_id == self.store_id:
                 yield key
 
-    def all(self):
+    def all_keys(self):
         d = self._rows.all_keys()
         d.addCallback(self._keys_for_store)
         d.addCallback(list)
+        return d
+
+    def _all_iterator(self, keys):
+        for key in keys:
+            yield self.get(key)
+
+    def all(self):
+        d = self.all_keys()
+        d.addCallback(self._all_iterator)
         return d
 
     def get(self, object_id):
@@ -177,8 +195,11 @@ class InMemoryStoreCollection(object):
             data = json.loads(data)
         return data
 
-    def all(self):
+    def all_keys(self):
         return self._defer(self._stores.keys())
+
+    def all(self):
+        return self._defer(self._get_data(key) for key in self._stores)
 
     def get(self, object_id):
         return self._defer(self._get_data(object_id))
@@ -235,8 +256,12 @@ class InMemoryRowCollection(object):
             data = json.loads(data)
         return data
 
+    def all_keys(self):
+        return self._defer([key for store_id, key in self._rows
+                            if store_id == self.store_id])
+
     def all(self):
-        return self._defer([key for store_id, key in self._rows.keys()
+        return self._defer([self._get_data(key) for store_id, key in self._rows
                             if store_id == self.store_id])
 
     def get(self, object_id):

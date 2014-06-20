@@ -1,6 +1,7 @@
 from functools import wraps
 
-from twisted.internet.defer import inlineCallbacks, returnValue, gatherResults
+from twisted.internet.defer import (
+    inlineCallbacks, returnValue, gatherResults, maybeDeferred)
 from twisted.internet.task import Clock
 from twisted.trial.unittest import TestCase, SkipTest
 from vumi.tests.helpers import VumiTestCase, PersistenceHelper
@@ -49,13 +50,27 @@ class CommonStoreTests(object):
             raise SkipTest("Skipped for %s" % (type(backend),))
         return backend
 
+    def filtered_all_keys(self, collection):
+        """
+        Get all keys in a collection. Some backends may have some index
+        deletion lag, so we might need to filter the results. This
+        implementation doesn't do any filtering, but subclasses can override.
+        """
+        return collection.all_keys()
+
     def filtered_all(self, collection):
         """
-        Some backends may have some index deletion lag, so we might need to
-        filter the results. This implementation doesn't do any filtering, but
-        subclasses can override.
+        Get all objects in a collection. Some backends may have some index
+        deletion lag, so we might need to filter the results. This
+        implementation doesn't do any filtering, but subclasses can override.
+
+        This waits for all deferreds to fire before returning.
         """
-        return collection.all()
+        d = collection.all()
+        d.addCallback(lambda objs: [maybeDeferred(lambda: o) for o in objs])
+        d.addCallback(gatherResults)
+        d.addCallback(lambda objs: [o for o in objs if o is not None])
+        return d
 
     def ensure_equal(self, foo, bar, msg=None):
         """
@@ -113,12 +128,23 @@ class CommonStoreTests(object):
         """
         backend = self.get_store_backend()
         stores = yield backend.get_store_collection(owner)
-        keys = yield self.filtered_all(stores)
+        keys = yield self.filtered_all_keys(stores)
         self.ensure_equal(
             keys, [],
             "Expected empty store collection for %r, got keys: %r" % (
                 owner, keys))
         returnValue(stores)
+
+    @inlineCallbacks
+    def test_store_collection_all_keys_empty(self):
+        """
+        Listing all stores returns an empty list when no stores exist.
+        """
+        backend = self.get_store_backend()
+        stores = yield backend.get_store_collection("me")
+
+        store_keys = yield self.filtered_all_keys(stores)
+        self.assertEqual(store_keys, [])
 
     @inlineCallbacks
     def test_store_collection_all_empty(self):
@@ -128,8 +154,21 @@ class CommonStoreTests(object):
         backend = self.get_store_backend()
         stores = yield backend.get_store_collection("me")
 
-        store_keys = yield self.filtered_all(stores)
-        self.assertEqual(store_keys, [])
+        all_store_data = yield self.filtered_all(stores)
+        self.assertEqual(all_store_data, [])
+
+    @inlineCallbacks
+    def test_store_collection_all_not_empty(self):
+        """
+        Listing all stores returns a non-empty list when stores exist.
+        """
+        backend = self.get_store_backend()
+        stores = yield backend.get_store_collection("me")
+        store_key = yield stores.create(None, {})
+        store_data = yield stores.get(store_key)
+
+        all_store_data = yield self.filtered_all(stores)
+        self.assertEqual(all_store_data, [store_data])
 
     @inlineCallbacks
     def test_store_collection_create_no_id_no_data(self):
@@ -159,7 +198,7 @@ class CommonStoreTests(object):
         stores = yield self.get_empty_store_collection()
 
         store_key = yield stores.create(None, {'foo': 'bar'})
-        store_keys = yield self.filtered_all(stores)
+        store_keys = yield self.filtered_all_keys(stores)
         self.assertEqual(store_keys, [store_key])
         store_data = yield stores.get(store_key)
         self.assertEqual(store_data, {'foo': 'bar', 'id': store_key})
@@ -170,21 +209,21 @@ class CommonStoreTests(object):
 
         store_data = yield stores.delete('foo')
         self.assertEqual(store_data, None)
-        store_keys = yield self.filtered_all(stores)
+        store_keys = yield self.filtered_all_keys(stores)
         self.assertEqual(store_keys, [])
 
     @inlineCallbacks
     def test_store_collection_delete_existing_store(self):
         stores = yield self.get_empty_store_collection()
         store_key = yield stores.create(None, {})
-        store_keys = yield self.filtered_all(stores)
+        store_keys = yield self.filtered_all_keys(stores)
         self.ensure_equal(store_keys, [store_key])
 
         store_data = yield stores.delete(store_key)
         self.assertEqual(store_data, {'id': store_key})
         store_data = yield stores.get(store_key)
         self.assertEqual(store_data, None)
-        store_keys = yield self.filtered_all(stores)
+        store_keys = yield self.filtered_all_keys(stores)
         self.assertEqual(store_keys, [])
 
     @inlineCallbacks
@@ -213,12 +252,37 @@ class CommonStoreTests(object):
         """
         backend = self.get_store_backend()
         rows = yield backend.get_row_collection(owner_id, store_id)
-        keys = yield self.filtered_all(rows)
+        keys = yield self.filtered_all_keys(rows)
         self.ensure_equal(
             keys, [],
             "Expected empty row collection for %r:%r, got keys: %r" % (
                 owner_id, store_id, keys))
         returnValue(rows)
+
+    @inlineCallbacks
+    def test_row_collection_all_keys_empty(self):
+        """
+        Listing all rows returns an empty list when no rows exist in the store.
+        """
+        backend = self.get_store_backend()
+        rows = yield backend.get_row_collection("me", "store")
+
+        row_keys = yield self.filtered_all_keys(rows)
+        self.assertEqual(row_keys, [])
+
+    @inlineCallbacks
+    def test_row_collection_all_keys_empty_rows_in_other_store(self):
+        """
+        Listing all rows returns an empty list when no rows exist in the store,
+        even when rows exist in other stores.
+        """
+        backend = self.get_store_backend()
+        rows = yield backend.get_row_collection("me", "store")
+        other_rows = yield backend.get_row_collection("me", "other_store")
+        yield other_rows.create(None, {})
+
+        row_keys = yield self.filtered_all_keys(rows)
+        self.assertEqual(row_keys, [])
 
     @inlineCallbacks
     def test_row_collection_all_empty(self):
@@ -228,8 +292,21 @@ class CommonStoreTests(object):
         backend = self.get_store_backend()
         rows = yield backend.get_row_collection("me", "store")
 
-        row_keys = yield self.filtered_all(rows)
-        self.assertEqual(row_keys, [])
+        all_row_data = yield self.filtered_all(rows)
+        self.assertEqual(all_row_data, [])
+
+    @inlineCallbacks
+    def test_row_collection_all_not_empty(self):
+        """
+        Listing all rows returns a non-empty list when rows exist in the store.
+        """
+        backend = self.get_store_backend()
+        rows = yield backend.get_row_collection("me", "store")
+        row_key = yield rows.create(None, {})
+        row_data = yield rows.get(row_key)
+
+        all_row_data = yield self.filtered_all(rows)
+        self.assertEqual(all_row_data, [row_data])
 
     @inlineCallbacks
     def test_row_collection_all_empty_rows_in_other_store(self):
@@ -242,8 +319,8 @@ class CommonStoreTests(object):
         other_rows = yield backend.get_row_collection("me", "other_store")
         yield other_rows.create(None, {})
 
-        row_keys = yield self.filtered_all(rows)
-        self.assertEqual(row_keys, [])
+        all_row_data = yield self.filtered_all(rows)
+        self.assertEqual(all_row_data, [])
 
     @inlineCallbacks
     def test_row_collection_create_no_id_no_data(self):
@@ -273,7 +350,7 @@ class CommonStoreTests(object):
         rows = yield self.get_empty_row_collection()
 
         row_key = yield rows.create(None, {'foo': 'bar'})
-        row_keys = yield self.filtered_all(rows)
+        row_keys = yield self.filtered_all_keys(rows)
         self.assertEqual(row_keys, [row_key])
         row_data = yield rows.get(row_key)
         self.assertEqual(row_data, {'foo': 'bar', 'id': row_key})
@@ -284,19 +361,19 @@ class CommonStoreTests(object):
 
         row_data = yield rows.delete('foo')
         self.assertEqual(row_data, None)
-        row_keys = yield self.filtered_all(rows)
+        row_keys = yield self.filtered_all_keys(rows)
         self.assertEqual(row_keys, [])
 
     @inlineCallbacks
     def test_row_collection_delete_existing_row(self):
         rows = yield self.get_empty_row_collection()
         row_key = yield rows.create(None, {})
-        row_keys = yield self.filtered_all(rows)
+        row_keys = yield self.filtered_all_keys(rows)
         self.ensure_equal(row_keys, [row_key])
 
         row_data = yield rows.delete(row_key)
         self.assertEqual(row_data, {'id': row_key})
-        row_keys = yield self.filtered_all(rows)
+        row_keys = yield self.filtered_all_keys(rows)
         self.assertEqual(row_keys, [])
 
     @inlineCallbacks
@@ -336,7 +413,7 @@ class TestRiakStore(VumiTestCase, CommonStoreTests):
         return RiakCollectionBackend(self.manager)
 
     @inlineCallbacks
-    def filtered_all(self, collection):
+    def filtered_all_keys(self, collection):
         """
         There's a delay (3s by default) between object deletion and tombstone
         cleanup in Riak. Index entries only get removed after this, so we check
@@ -344,10 +421,10 @@ class TestRiakStore(VumiTestCase, CommonStoreTests):
         objects associated with them.
 
         This means we're never actually checking that deleted objects get
-        removed from the return value of .all() but we can probably assume that
-        Riak indexes work properly.
+        removed from the return value of .all_keys() but we can probably assume
+        that Riak indexes work properly.
         """
-        keys = yield collection.all()
+        keys = yield collection.all_keys()
 
         def check_key(key):
             d = collection.get(key)
