@@ -56,14 +56,19 @@ class CollectionHandler(RequestHandler):
         """
         Return all elements from a collection.
         """
-        return self._write_objects(self.collection.all())
+        d = self._write_objects(self.collection.all())
+        d.addErrback(self._err, 500, "Failed to retrieve object.")
+        return d
 
     def post(self, *args, **kw):
         """
         Create an element witin a collection.
         """
         data = json.loads(self.request.body)
-        return self.collection.create(data)
+        d = self.collection.create(None, data)
+        d.addCallback(self._write_object)
+        d.addErrback(self._err, 500, "Failed to create object.")
+        return d
 
 
 class ElementHandler(RequestHandler):

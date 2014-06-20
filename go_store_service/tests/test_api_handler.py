@@ -4,6 +4,8 @@ from unittest import TestCase
 
 from zope.interface import implementer
 
+from twisted.internet.defer import inlineCallbacks
+
 from cyclone.web import Application
 from cyclone.httpserver import HTTPRequest, HTTPConnection
 
@@ -101,25 +103,36 @@ class TestCollectionHandler(TestCase):
     def test_err(self):
         pass
 
+    @inlineCallbacks
     def test_write_object(self):
         handler = self.mk_handler()
-        handler._write_object({"id": "foo"})
+        yield handler._write_object({"id": "foo"})
         self.assert_written(handler, [{"id": "foo"}])
 
+    @inlineCallbacks
     def test_write_objects(self):
         handler = self.mk_handler()
-        handler._write_objects([
+        yield handler._write_objects([
             {"id": "obj1"}, {"id": "obj2"},
         ])
         self.assert_written(handler, [
             {"id": "obj1"}, {"id": "obj2"},
         ])
 
+    @inlineCallbacks
     def test_get(self):
-        pass
+        handler = self.mk_handler()
+        handler.prepare()
+        yield handler.get()
+        self.assert_written(handler, ["XXX"])
 
+    @inlineCallbacks
     def test_post(self):
-        pass
+        handler = self.mk_handler()
+        handler.prepare()
+        handler.request.body = json.dumps({"id": "obj1"})
+        yield handler.post()
+        self.assert_written(handler, ["XXX"])
 
 
 class TestElementHandler(TestCase):
