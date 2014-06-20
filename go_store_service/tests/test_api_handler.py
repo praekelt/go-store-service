@@ -1,6 +1,6 @@
 import json
-from uuid import uuid4
-from unittest import TestCase
+import itertools
+from twisted.trial.unittest import TestCase
 
 from zope.interface import implementer
 
@@ -24,6 +24,7 @@ class DummyCollection(object):
 
     def __init__(self, objects, reactor=None):
         self._objects = objects
+        self._id_counter = itertools.count()
         self.reactor = reactor
 
     def _defer(self, value):
@@ -41,7 +42,7 @@ class DummyCollection(object):
     def create(self, object_id, data):
         assert object_id not in self._objects
         if object_id is None:
-            object_id = uuid4().hex
+            object_id = "id%s" % (self._id_counter.next(),)
         self._objects[object_id] = data.copy()
         return self._defer(object_id)
 
@@ -124,15 +125,17 @@ class TestCollectionHandler(TestCase):
         handler = self.mk_handler()
         handler.prepare()
         yield handler.get()
-        self.assert_written(handler, ["XXX"])
+        self.assert_written(handler, [
+            {"id": "obj1"}, {"id": "obj2"},
+        ])
 
     @inlineCallbacks
     def test_post(self):
         handler = self.mk_handler()
         handler.prepare()
-        handler.request.body = json.dumps({"id": "obj1"})
+        handler.request.body = json.dumps({"id": "obj3"})
         yield handler.post()
-        self.assert_written(handler, ["XXX"])
+        self.assert_written(handler, [{"id": "id0"}])
 
 
 class TestElementHandler(TestCase):

@@ -66,7 +66,7 @@ class CollectionHandler(RequestHandler):
         """
         data = json.loads(self.request.body)
         d = self.collection.create(None, data)
-        d.addCallback(self._write_object)
+        d.addCallback(lambda object_id: self._write_object({"id": object_id}))
         d.addErrback(self._err, 500, "Failed to create object.")
         return d
 
