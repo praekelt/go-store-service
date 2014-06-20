@@ -3,8 +3,14 @@
 
 import json
 
-from cyclone.web import RequestHandler, Application, URLSpec
 from twisted.internet.defer import maybeDeferred, inlineCallbacks
+from twisted.python import log
+
+from cyclone.web import RequestHandler, Application, URLSpec, HTTPError
+
+
+def ensure_deferred(x):
+    return maybeDeferred(lambda x: x, x)
 
 
 class CollectionHandler(RequestHandler):
@@ -21,16 +27,28 @@ class CollectionHandler(RequestHandler):
         self.collection_factory = collection_factory
 
     def prepare(self):
-        self.collection = self.collection_factory(**self.path_kwargs)
+        kw = self.path_kwargs
+        if kw is None:
+            kw = {}
+        self.collection = self.collection_factory(**kw)
+
+    def _err(self, failure, code, message):
+        log.err(failure)
+        raise HTTPError(code, message)
 
     def _write_object(self, obj):
-        d = maybeDeferred(obj)
+        d = ensure_deferred(obj)
         d.addCallback(self.write)
-        # TODO: add errback
+        d.addErrback(self._err, 500, "Failed to write object")
+        return d
 
     @inlineCallbacks
     def _write_objects(self, objs):
-        for obj in objs:
+        objs = yield objs
+        for obj_deferred in objs:
+            obj = yield obj_deferred
+            if obj is None:
+                continue
             yield self._write_obj(obj)
 
     def get(self, *args, **kw):
@@ -66,10 +84,15 @@ class ElementHandler(RequestHandler):
         self.elem_id = kw.pop('elem_id')
         self.collection = self.collection_factory(**kw)
 
+    def _err(self, failure, code, message):
+        log.err(failure)
+        raise HTTPError(code, message)
+
     def _write_object(self, obj):
-        d = maybeDeferred(obj)
+        d = ensure_deferred(obj)
         d.addCallback(self.write)
-        # TODO: add errback
+        d.addErrback(self._err, 500, "Failed to write object")
+        return d
 
     def get(self, *args, **kw):
         """
