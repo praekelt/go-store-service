@@ -67,7 +67,8 @@ class DummyCollection(object):
 
 
 def make_request(method="GET", uri="http://example.com/"):
-    """ Make a request on a generic application instance.
+    """
+    Make a request on a generic application instance.
     """
     app = Application()
     conn = HTTPConnection()
@@ -76,12 +77,12 @@ def make_request(method="GET", uri="http://example.com/"):
     return HTTPRequest(method=method, uri=uri, connection=conn)
 
 
-class TestCollectionHandler(TestCase):
-    def setUp(self):
-        self.collection = DummyCollection({
-            "obj1": {"id": "obj1"},
-            "obj2": {"id": "obj2"},
-        })
+class HandlerHelper(object):
+    """
+    Helper for testing handlers.
+    """
+    def __init__(self, collection):
+        self.collection = collection
 
     def mk_handler(self):
         request = make_request()
@@ -90,29 +91,24 @@ class TestCollectionHandler(TestCase):
         return CollectionHandler(
             app, request, collection_factory=collection_factory)
 
-    def assert_written(self, handler, expected):
+    def written_objects(self, handler):
         data = "".join(handler._write_buffer)
         lines = data.splitlines()
-        objs = [json.loads(l) for l in lines]
-        self.assertEqual(objs, expected)
+        return [json.loads(l) for l in lines]
 
-    def handler_data(self, handler):
-        return "".join(handler._write_buffer)
 
-    def test_initialize(self):
-        handler = self.mk_handler()
-        self.assertEqual(handler.collection_factory(), self.collection)
+class TestBaseHandler(TestCase):
+    def setUp(self):
+        self.helper = HandlerHelper(DummyCollection({
+            "obj1": {"id": "obj1"},
+            "obj2": {"id": "obj2"},
+        }))
 
-    def test_prepare(self):
-        handler = self.mk_handler()
-        handler.prepare()
-        self.assertEqual(handler.collection, self.collection)
-
-    def test_err(self):
-        handler = self.mk_handler()
+    def test_raise_err(self):
+        handler = self.helper.mk_handler()
         f = Failure(TestError("Moop"))
         try:
-            handler._err(f, 500, "Eep")
+            handler.raise_err(f, 500, "Eep")
         except HTTPError, err:
             pass
         self.assertEqual(err.status_code, 500)
@@ -122,36 +118,57 @@ class TestCollectionHandler(TestCase):
 
     @inlineCallbacks
     def test_write_object(self):
-        handler = self.mk_handler()
-        yield handler._write_object({"id": "foo"})
-        self.assert_written(handler, [{"id": "foo"}])
+        handler = self.helper.mk_handler()
+        yield handler.write_object({"id": "foo"})
+        self.assertEqual(
+            self.helper.written_objects(handler),
+            [{"id": "foo"}])
 
     @inlineCallbacks
     def test_write_objects(self):
-        handler = self.mk_handler()
-        yield handler._write_objects([
+        handler = self.helper.mk_handler()
+        yield handler.write_objects([
             {"id": "obj1"}, {"id": "obj2"},
         ])
-        self.assert_written(handler, [
-            {"id": "obj1"}, {"id": "obj2"},
-        ])
+        self.assertEqual(
+            self.helper.written_objects(handler),
+            [{"id": "obj1"}, {"id": "obj2"}])
+
+
+class TestCollectionHandler(TestCase):
+    def setUp(self):
+        self.helper = HandlerHelper(DummyCollection({
+            "obj1": {"id": "obj1"},
+            "obj2": {"id": "obj2"},
+        }))
+
+    def test_initialize(self):
+        handler = self.helper.mk_handler()
+        self.assertEqual(handler.collection_factory(), self.helper.collection)
+
+    def test_prepare(self):
+        handler = self.helper.mk_handler()
+        handler.prepare()
+        self.assertEqual(handler.collection, self.helper.collection)
 
     @inlineCallbacks
     def test_get(self):
-        handler = self.mk_handler()
+        handler = self.helper.mk_handler()
         handler.prepare()
         yield handler.get()
-        self.assert_written(handler, [
-            {"id": "obj1"}, {"id": "obj2"},
-        ])
+        self.assertEqual(
+            self.helper.written_objects(handler),
+            [{"id": "obj1"}, {"id": "obj2"}])
 
     @inlineCallbacks
     def test_post(self):
-        handler = self.mk_handler()
+        handler = self.helper.mk_handler()
         handler.prepare()
         handler.request.body = json.dumps({"id": "obj3"})
         yield handler.post()
-        self.assert_written(handler, [{"id": "id0"}])
+        self.assertEqual(
+            self.helper.written_objects(handler),
+            [{"id": "id0"}])
 
 
 class TestElementHandler(TestCase):

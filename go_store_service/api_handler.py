@@ -13,7 +13,57 @@ def ensure_deferred(x):
     return maybeDeferred(lambda x: x, x)
 
 
-class CollectionHandler(RequestHandler):
+class BaseHandler(RequestHandler):
+    """
+    Base class for utility methods for :class:`CollectionHandler`
+    and :class:`ElementHandler`.
+    """
+
+    def raise_err(self, failure, status_code, reason):
+        """
+        Log the failure and raise a suitable :class:`HTTPError`.
+
+        :type failure: twisted.python.failure.Failure
+        :param failure:
+            failure that caused the error.
+        :param int status_code:
+            HTTP status code to return.
+        :param str reason:
+            HTTP reason to return along with the status.
+        """
+        log.err(failure)
+        raise HTTPError(status_code, reason=reason)
+
+    def write_object(self, obj):
+        """
+        Write a serializable object out as JSON.
+
+        :param dict obj:
+            JSON serializable object to write out.
+        """
+        d = ensure_deferred(obj)
+        d.addCallback(self.write)
+        d.addErrback(self.raise_err, 500, "Failed to write object")
+        return d
+
+    @inlineCallbacks
+    def write_objects(self, objs):
+        """
+        Write out a list of serialable objects as newline separated JSON.
+
+        :param list objs:
+            List of dictionaries to write out.
+        """
+        objs = yield objs
+        for obj_deferred in objs:
+            obj = yield obj_deferred
+            if obj is None:
+                continue
+            yield self.write_object(obj)
+            self.write("\n")
+
+
+class CollectionHandler(BaseHandler):
     """
     Handler for operations on a collection as a whole.
 
@@ -32,32 +82,12 @@ class CollectionHandler(RequestHandler):
             kw = {}
         self.collection = self.collection_factory(**kw)
 
-    def _err(self, failure, status_code, reason):
-        log.err(failure)
-        raise HTTPError(status_code, reason=reason)
-
-    def _write_object(self, obj):
-        d = ensure_deferred(obj)
-        d.addCallback(self.write)
-        d.addErrback(self._err, 500, "Failed to write object")
-        return d
-
-    @inlineCallbacks
-    def _write_objects(self, objs):
-        objs = yield objs
-        for obj_deferred in objs:
-            obj = yield obj_deferred
-            if obj is None:
-                continue
-            yield self._write_object(obj)
-            self.write("\n")
-
     def get(self, *args, **kw):
         """
         Return all elements from a collection.
         """
-        d = self._write_objects(self.collection.all())
-        d.addErrback(self._err, 500, "Failed to retrieve object.")
+        d = self.write_objects(self.collection.all())
+        d.addErrback(self.raise_err, 500, "Failed to retrieve object.")
         return d
 
     def post(self, *args, **kw):
@@ -66,12 +96,12 @@ class CollectionHandler(RequestHandler):
         """
         data = json.loads(self.request.body)
         d = self.collection.create(None, data)
-        d.addCallback(lambda object_id: self._write_object({"id": object_id}))
-        d.addErrback(self._err, 500, "Failed to create object.")
+        d.addCallback(lambda object_id: self.write_object({"id": object_id}))
+        d.addErrback(self.raise_err, 500, "Failed to create object.")
         return d
 
 
-class ElementHandler(RequestHandler):
+class ElementHandler(BaseHandler):
     """
     Handler for operations on an element within a collection.
 
@@ -90,21 +120,11 @@ class ElementHandler(RequestHandler):
         self.elem_id = kw.pop('elem_id')
         self.collection = self.collection_factory(**kw)
 
-    def _err(self, failure, code, message):
-        log.err(failure)
-        raise HTTPError(code, message)
-
-    def _write_object(self, obj):
-        d = ensure_deferred(obj)
-        d.addCallback(self.write)
-        d.addErrback(self._err, 500, "Failed to write object")
-        return d
-
     def get(self, *args, **kw):
         """
         Retrieve an element within a collection.
         """
-        return self._write_object(self.collection.get(self.elem_id))
+        return self.write_object(self.collection.get(self.elem_id))
 
     def put(self, *args, **kw):
         """
