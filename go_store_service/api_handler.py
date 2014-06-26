@@ -32,9 +32,9 @@ class CollectionHandler(RequestHandler):
             kw = {}
         self.collection = self.collection_factory(**kw)
 
-    def _err(self, failure, code, message):
+    def _err(self, failure, status_code, reason):
         log.err(failure)
-        raise HTTPError(code, message)
+        raise HTTPError(status_code, reason=reason)
 
     def _write_object(self, obj):
         d = ensure_deferred(obj)

@@ -1,12 +1,13 @@
 import json
 import itertools
 from twisted.trial.unittest import TestCase
+from twisted.python.failure import Failure
 
 from zope.interface import implementer
 
 from twisted.internet.defer import inlineCallbacks
 
-from cyclone.web import Application
+from cyclone.web import Application, HTTPError
 from cyclone.httpserver import HTTPRequest, HTTPConnection
 
 from go_store_service.interfaces import ICollection
@@ -14,6 +15,12 @@ from go_store_service.collections import defer_async
 from go_store_service.api_handler import (
     CollectionHandler, ElementHandler,
     create_urlspec_regex, ApiApplication)
+
+
+class TestError(Exception):
+    """
+    Exception for use in tests.
+    """
 
 
 @implementer(ICollection)
@@ -102,7 +109,16 @@ class TestCollectionHandler(TestCase):
         self.assertEqual(handler.collection, self.collection)
 
     def test_err(self):
-        pass
+        handler = self.mk_handler()
+        f = Failure(TestError("Moop"))
+        try:
+            handler._err(f, 500, "Eep")
+        except HTTPError, err:
+            pass
+        self.assertEqual(err.status_code, 500)
+        self.assertEqual(err.reason, "Eep")
+        [err] = self.flushLoggedErrors(TestError)
+        self.assertEqual(err, f)
 
     @inlineCallbacks
     def test_write_object(self):
