@@ -8,8 +8,6 @@ from zope.interface import implementer
 
 from twisted.internet.defer import inlineCallbacks
 
-import treq
-
 from cyclone.web import HTTPError
 
 from go_store_service.interfaces import ICollection
@@ -208,23 +206,20 @@ class TestElementHandler(TestCase):
     def test_put(self):
         self.assertEqual(self.collection.objects["obj2"],
                          {"id": "obj2"})
-        response = yield self.app_helper.put(
+        data = yield self.app_helper.put(
             '/root/obj2',
-            data=json.dumps({"id": "obj2", "foo": "bar"}))
-        data = yield treq.content(response)
-        # TODO: JSON response
-        self.assertEqual(data, "")
+            data=json.dumps({"id": "obj2", "foo": "bar"}),
+            parser='json')
+        self.assertEqual(data, {"success": True})
         self.assertEqual(self.collection.objects["obj2"],
                          {"id": "obj2", "foo": "bar"})
 
     @inlineCallbacks
     def test_delete(self):
         self.assertTrue("obj1" in self.collection.objects)
-        response = yield self.app_helper.delete(
-            '/root/obj1')
-        data = yield treq.content(response)
-        # TODO: JSON response
-        self.assertEqual(data, "")
+        data = yield self.app_helper.delete(
+            '/root/obj1', parser='json')
+        self.assertEqual(data, {"success": True})
         self.assertTrue("obj1" not in self.collection.objects)
 
 

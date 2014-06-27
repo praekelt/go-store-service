@@ -157,20 +157,31 @@ class ElementHandler(BaseHandler):
         """
         Retrieve an element within a collection.
         """
-        return self.write_object(self.collection.get(self.elem_id))
+        d = self.write_object(self.collection.get(self.elem_id))
+        d.addErrback(self.raise_err, 500,
+                     "Failed to retrieve %r" % (self.elem_id,))
+        return d
 
     def put(self, *args, **kw):
         """
         Update an element within a collection.
         """
         data = json.loads(self.request.body)
-        return self.collection.update(self.elem_id, data)
+        d = self.collection.update(self.elem_id, data)
+        d.addCallback(lambda r: self.write_object({"success": True}))
+        d.addErrback(self.raise_err, 500,
+                     "Failed to update %r" % (self.elem_id,))
+        return d
 
     def delete(self, *args, **kw):
         """
         Delete an element from within a collection.
         """
-        return self.collection.delete(self.elem_id)
+        d = self.collection.delete(self.elem_id)
+        d.addCallback(lambda r: self.write_object({"success": True}))
+        d.addErrback(self.raise_err, 500,
+                     "Failed to delete %r" % (self.elem_id,))
+        return d
 
 
 class ApiApplication(Application):
