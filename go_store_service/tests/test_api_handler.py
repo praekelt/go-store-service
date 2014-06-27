@@ -5,17 +5,18 @@ from twisted.python.failure import Failure
 
 from zope.interface import implementer
 
-from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import inlineCallbacks
 
 import treq
 
-from cyclone.web import Application, HTTPError, URLSpec
+from cyclone.web import HTTPError, URLSpec
 
 from go_store_service.interfaces import ICollection
 from go_store_service.collections import defer_async
 from go_store_service.api_handler import (
     BaseHandler, CollectionHandler, ElementHandler,
     create_urlspec_regex, ApiApplication)
+from go_store_service.tests.helpers import HandlerHelper, AppHelper
 
 
 class TestError(Exception):
@@ -67,44 +68,6 @@ class DummyCollection(object):
         return self._defer(data)
 
 
-class HandlerHelper(object):
-    """
-    Helper for testing handlers.
-    """
-    def __init__(self, urlspec, handler_kwargs=None):
-        self.urlspec = urlspec
-        self.handler_kwargs = handler_kwargs or {}
-        self.app = Application([self.urlspec])
-
-    def _stubby_request(self):
-        class DummyConn(object):
-            pass
-
-        class DummyReq(object):
-            def __init__(self):
-                self.supports_http_1_1 = lambda: True
-                self.connection = DummyConn()
-
-        return DummyReq()
-
-    def mk_handler(self):
-        request = self._stubby_request()
-        return self.urlspec.handler_class(
-            self.app, request, **self.handler_kwargs)
-
-    @inlineCallbacks
-    def do_request(self, *args, **kw):
-        from twisted.internet import reactor
-        server = reactor.listenTCP(0, self.app, interface="127.0.0.1")
-        host = server.getHost()
-        kw['url'] = ('http://127.0.0.1:%d' % host.port) + kw['url']
-        kw['persistent'] = False
-        response = yield treq.request(*args, **kw)
-        yield server.stopListening()
-        server.loseConnection()
-        returnValue(response)
-
-
 class TestCreateUrlspecRegex(TestCase):
     def test_no_variables(self):
         self.assertEqual(create_urlspec_regex("/foo/bar"), "/foo/bar")
@@ -131,10 +94,10 @@ class TestCreateUrlspecRegex(TestCase):
 
 class TestBaseHandler(TestCase):
     def setUp(self):
-        self.helper = HandlerHelper(URLSpec('/root', BaseHandler))
+        self.handler_helper = HandlerHelper(BaseHandler)
 
     def test_raise_err(self):
-        handler = self.helper.mk_handler()
+        handler = self.handler_helper.mk_handler()
         f = Failure(TestError("Moop"))
         try:
             handler.raise_err(f, 500, "Eep")
@@ -148,7 +111,7 @@ class TestBaseHandler(TestCase):
     @inlineCallbacks
     def test_write_object(self):
         writes = []
-        handler = self.helper.mk_handler()
+        handler = self.handler_helper.mk_handler()
         handler.write = lambda d: writes.append(d)
         yield handler.write_object({"id": "foo"})
         self.assertEqual(writes, [
@@ -158,7 +121,7 @@ class TestBaseHandler(TestCase):
     @inlineCallbacks
     def test_write_objects(self):
         writes = []
-        handler = self.helper.mk_handler()
+        handler = self.handler_helper.mk_handler()
         handler.write = lambda d: writes.append(d)
         yield handler.write_objects([
             {"id": "obj1"}, {"id": "obj2"},
@@ -176,36 +139,35 @@ class TestCollectionHandler(TestCase):
             "obj2": {"id": "obj2"},
         })
         self.collection_factory = lambda: self.collection
-        self.helper = HandlerHelper(
-            CollectionHandler.mk_urlspec('/root', self.collection_factory),
+        self.handler_helper = HandlerHelper(
+            CollectionHandler,
             handler_kwargs={'collection_factory': self.collection_factory})
+        self.app_helper = AppHelper(
+            urlspec=CollectionHandler.mk_urlspec(
+                '/root', self.collection_factory))
 
     def test_initialize(self):
-        handler = self.helper.mk_handler()
+        handler = self.handler_helper.mk_handler()
         self.assertEqual(handler.collection_factory(), self.collection)
 
     def test_prepare(self):
-        handler = self.helper.mk_handler()
+        handler = self.handler_helper.mk_handler()
         handler.prepare()
         self.assertEqual(handler.collection, self.collection)
 
     @inlineCallbacks
     def test_get(self):
-        response = yield self.helper.do_request(method='GET', url='/root')
+        response = yield self.app_helper.do_request(method='GET', url='/root')
         raw_data = yield treq.content(response)
         data = [json.loads(s) for s in raw_data.splitlines()]
-        self.assertEqual(
-            data,
-            [{"id": "obj1"}, {"id": "obj2"}])
+        self.assertEqual(data, [{"id": "obj1"}, {"id": "obj2"}])
 
     @inlineCallbacks
     def test_post(self):
-        response = yield self.helper.do_request(method='POST', url='/root',
-                                                data=json.dumps({}))
+        response = yield self.app_helper.do_request(method='POST', url='/root',
+                                                    data=json.dumps({}))
         data = yield treq.json_content(response)
-        self.assertEqual(
-            data,
-            {"id": "id0"})
+        self.assertEqual(data, {"id": "id0"})
 
 
 class TestElementHandler(TestCase):
@@ -215,16 +177,19 @@ class TestElementHandler(TestCase):
             "obj2": {"id": "obj2"},
         })
         self.collection_factory = lambda: self.collection
-        self.helper = HandlerHelper(
-            ElementHandler.mk_urlspec('/root', self.collection_factory),
+        self.handler_helper = HandlerHelper(
+            ElementHandler,
             handler_kwargs={'collection_factory': self.collection_factory})
+        self.app_helper = AppHelper(
+            urlspec=ElementHandler.mk_urlspec(
+                '/root', self.collection_factory))
 
     def test_initialize(self):
-        handler = self.helper.mk_handler()
+        handler = self.handler_helper.mk_handler()
         self.assertEqual(handler.collection_factory(), self.collection)
 
     def test_prepare(self):
-        handler = self.helper.mk_handler()
+        handler = self.handler_helper.mk_handler()
         handler.path_kwargs = {"elem_id": "id-1"}
         handler.prepare()
         self.assertEqual(handler.collection, self.collection)
@@ -232,7 +197,7 @@ class TestElementHandler(TestCase):
 
     @inlineCallbacks
     def test_get(self):
-        response = yield self.helper.do_request(
+        response = yield self.app_helper.do_request(
             method='GET', url='/root/obj1')
         data = yield treq.json_content(response)
         self.assertEqual(
@@ -241,7 +206,7 @@ class TestElementHandler(TestCase):
 
     @inlineCallbacks
     def test_put(self):
-        response = yield self.helper.do_request(
+        response = yield self.app_helper.do_request(
             method='PUT', url='/root/obj2',
             data=json.dumps({"id": "obj2", "foo": "bar"}))
         data = yield treq.content(response)
@@ -251,7 +216,7 @@ class TestElementHandler(TestCase):
 
     @inlineCallbacks
     def test_delete(self):
-        response = yield self.helper.do_request(
+        response = yield self.app_helper.do_request(
             method='DELETE', url='/root/obj1')
         data = yield treq.content(response)
         # TODO: JSON response
