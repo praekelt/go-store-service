@@ -1,3 +1,4 @@
+import copy
 import json
 import itertools
 from twisted.trial.unittest import TestCase
@@ -34,10 +35,14 @@ class DummyCollection(object):
     def __init__(self, objects, reactor=None):
         self._objects = objects
         self._id_counter = itertools.count()
-        self.reactor = reactor
+        self._reactor = reactor
+
+    @property
+    def objects(self):
+        return copy.deepcopy(self._objects)
 
     def _defer(self, value):
-        return defer_async(value, self.reactor)
+        return defer_async(value, self._reactor)
 
     def all_keys(self):
         return self._defer(self._objects.keys())
@@ -163,8 +168,9 @@ class TestCollectionHandler(TestCase):
     @inlineCallbacks
     def test_post(self):
         data = yield self.app_helper.post(
-            '/root', data=json.dumps({}), parser='json')
+            '/root', data=json.dumps({"foo": "bar"}), parser='json')
         self.assertEqual(data, {"id": "id0"})
+        self.assertEqual(self.collection.objects["id0"], {"foo": "bar"})
 
 
 class TestElementHandler(TestCase):
@@ -200,22 +206,26 @@ class TestElementHandler(TestCase):
 
     @inlineCallbacks
     def test_put(self):
+        self.assertEqual(self.collection.objects["obj2"],
+                         {"id": "obj2"})
         response = yield self.app_helper.put(
             '/root/obj2',
             data=json.dumps({"id": "obj2", "foo": "bar"}))
         data = yield treq.content(response)
         # TODO: JSON response
         self.assertEqual(data, "")
-        # TODO: assert collection updated
+        self.assertEqual(self.collection.objects["obj2"],
+                         {"id": "obj2", "foo": "bar"})
 
     @inlineCallbacks
     def test_delete(self):
+        self.assertTrue("obj1" in self.collection.objects)
         response = yield self.app_helper.delete(
             '/root/obj1')
         data = yield treq.content(response)
         # TODO: JSON response
         self.assertEqual(data, "")
-        # TODO: assert collection updated
+        self.assertTrue("obj1" not in self.collection.objects)
 
 
 class TestApiApplication(TestCase):
