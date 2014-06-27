@@ -157,16 +157,13 @@ class TestCollectionHandler(TestCase):
 
     @inlineCallbacks
     def test_get(self):
-        response = yield self.app_helper.do_request(method='GET', url='/root')
-        raw_data = yield treq.content(response)
-        data = [json.loads(s) for s in raw_data.splitlines()]
+        data = yield self.app_helper.get('/root', parser='json_lines')
         self.assertEqual(data, [{"id": "obj1"}, {"id": "obj2"}])
 
     @inlineCallbacks
     def test_post(self):
-        response = yield self.app_helper.do_request(method='POST', url='/root',
-                                                    data=json.dumps({}))
-        data = yield treq.json_content(response)
+        data = yield self.app_helper.post(
+            '/root', data=json.dumps({}), parser='json')
         self.assertEqual(data, {"id": "id0"})
 
 
@@ -197,17 +194,14 @@ class TestElementHandler(TestCase):
 
     @inlineCallbacks
     def test_get(self):
-        response = yield self.app_helper.do_request(
-            method='GET', url='/root/obj1')
-        data = yield treq.json_content(response)
-        self.assertEqual(
-            data,
-            {"id": "obj1"})
+        data = yield self.app_helper.get(
+            '/root/obj1', parser='json')
+        self.assertEqual(data, {"id": "obj1"})
 
     @inlineCallbacks
     def test_put(self):
-        response = yield self.app_helper.do_request(
-            method='PUT', url='/root/obj2',
+        response = yield self.app_helper.put(
+            '/root/obj2',
             data=json.dumps({"id": "obj2", "foo": "bar"}))
         data = yield treq.content(response)
         # TODO: JSON response
@@ -216,8 +210,8 @@ class TestElementHandler(TestCase):
 
     @inlineCallbacks
     def test_delete(self):
-        response = yield self.app_helper.do_request(
-            method='DELETE', url='/root/obj1')
+        response = yield self.app_helper.delete(
+            '/root/obj1')
         data = yield treq.content(response)
         # TODO: JSON response
         self.assertEqual(data, "")
