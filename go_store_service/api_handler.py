@@ -13,6 +13,29 @@ def ensure_deferred(x):
     return maybeDeferred(lambda x: x, x)
 
 
+def create_urlspec_regex(dfn, *args, **kw):
+    """
+    Create a URLSpec regex from a friendlier definition.
+
+    Friendlier definitions look like:
+
+      /foo/:var/baz/:other_var
+
+    Generated regular expresions look like::
+
+      /foo/(?P<var>[^/]*)/baz/(?P<other_var>[^/]*)
+    """
+    def replace_part(part):
+        if not part.startswith(':'):
+            return part
+        name = part.lstrip(":")
+        return "(?P<%s>[^/]*)" % (name,)
+
+    parts = dfn.split("/")
+    parts = [replace_part(p) for p in parts]
+    return "/".join(parts)
+
+
 class BaseHandler(RequestHandler):
     """
     Base class for utility methods for :class:`CollectionHandler`
@@ -73,6 +96,11 @@ class CollectionHandler(BaseHandler):
     * ``POST /`` - add an item to the collection.
     """
 
+    @classmethod
+    def mk_urlspec(cls, dfn, collection_factory):
+        return URLSpec(create_urlspec_regex(dfn), cls,
+                       kwargs={"collection_factory": collection_factory})
+
     def initialize(self, collection_factory):
         self.collection_factory = collection_factory
 
@@ -112,6 +140,11 @@ class ElementHandler(BaseHandler):
     * ``DELETE /:elem_id`` - delete an element.
     """
 
+    @classmethod
+    def mk_urlspec(cls, dfn, collection_factory):
+        return URLSpec(create_urlspec_regex(dfn + '/:elem_id'), cls,
+                       kwargs={"collection_factory": collection_factory})
+
     def initialize(self, collection_factory):
         self.collection_factory = collection_factory
 
@@ -140,28 +173,6 @@ class ElementHandler(BaseHandler):
         return self.collection.delete(self.elem_id)
 
 
-def create_urlspec_regex(dfn, *args, **kw):
-    """Create a URLSpec regex from a friendlier definition.
-
-    Friendlier definitions look like:
-
-      /foo/:var/baz/:other_var
-
-    Generated regular expresions look like::
-
-      /foo/(?P<var>[^/]*)/baz/(?P<other_var>[^/]*)
-    """
-    def replace_part(part):
-        if not part.startswith(':'):
-            return part
-        name = part.lstrip(":")
-        return "(?P<%s>[^/]*)" % (name,)
-
-    parts = dfn.split("/")
-    parts = [replace_part(p) for p in parts]
-    return "/".join(parts)
-
-
 class ApiApplication(Application):
     """
     An API for a set of collections and adhoc additional methods.
@@ -181,10 +192,7 @@ class ApiApplication(Application):
         routes = []
         for dfn, collection_factory in self.collections:
             routes.extend((
-                URLSpec(create_urlspec_regex(dfn), CollectionHandler,
-                        kwargs={"collection_factory": collection_factory}),
-                URLSpec(create_urlspec_regex(dfn + '/:elem_id'),
-                        ElementHandler,
-                        kwargs={"collection_factory": collection_factory}),
+                CollectionHandler.mk_urlspec(dfn, collection_factory),
+                ElementHandler.mk_urlspec(dfn, collection_factory),
             ))
         return routes
