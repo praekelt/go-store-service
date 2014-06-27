@@ -86,6 +86,9 @@ class BaseHandler(RequestHandler):
             self.write("\n")
 
 
+# TODO: Sort out response metadata and make responses follow a consistent
+#       pattern.
+
 class CollectionHandler(BaseHandler):
     """
     Handler for operations on a collection as a whole.

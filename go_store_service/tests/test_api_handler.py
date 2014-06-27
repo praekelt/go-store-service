@@ -135,6 +135,8 @@ class TestBaseHandler(TestCase):
         ])
 
 
+# TODO: Test error handling
+
 class TestCollectionHandler(TestCase):
     def setUp(self):
         self.collection = DummyCollection({
