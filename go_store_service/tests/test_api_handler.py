@@ -9,7 +9,7 @@ from twisted.internet.defer import inlineCallbacks
 
 import treq
 
-from cyclone.web import HTTPError, URLSpec
+from cyclone.web import HTTPError
 
 from go_store_service.interfaces import ICollection
 from go_store_service.collections import defer_async
