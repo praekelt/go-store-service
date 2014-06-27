@@ -9,6 +9,7 @@ before_install:
   - sudo apt-get install -qq protobuf-compiler
 install:
   - "pip install -r requirements.txt --use-wheel"
+  - "pip install -r requirements-dev.txt --use-wheel"
   - "pip install coveralls --use-wheel"
 script:
   - coverage run --source=go_store_service `which trial` go_store_service
