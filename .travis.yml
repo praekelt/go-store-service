@@ -1,0 +1,17 @@
+language: python
+python:
+  - "2.6"
+  - "2.7"
+services:
+  - riak
+before_install:
+  # we need the protobuf-compiler so Vumi can install Riak client libraries
+  - sudo apt-get install -qq protobuf-compiler
+install:
+  - "pip install -r requirements.txt --use-wheel"
+  - "pip install -r requirements-dev.txt --use-wheel"
+  - "pip install coveralls --use-wheel"
+script:
+  - coverage run --source=go_store_service `which trial` go_store_service
+after_success:
+  - coveralls

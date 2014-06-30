@@ -1,0 +1,6 @@
+*.pyc
+*.egg-info/
+.coverage
+_trial_temp
+ve/
+docs/_build
