@@ -55,6 +55,7 @@ class BaseHandler(RequestHandler):
             HTTP reason to return along with the status.
         """
         log.err(failure)
+        # TODO: write out a JSON error response.
         raise HTTPError(status_code, reason=reason)
 
     def write_object(self, obj):
@@ -101,6 +102,7 @@ class CollectionHandler(BaseHandler):
 
     @classmethod
     def mk_urlspec(cls, dfn, collection_factory):
+        # TODO: docstring
         return URLSpec(create_urlspec_regex(dfn), cls,
                        kwargs={"collection_factory": collection_factory})
 
@@ -127,6 +129,7 @@ class CollectionHandler(BaseHandler):
         """
         data = json.loads(self.request.body)
         d = self.collection.create(None, data)
+        # TODO: better output once .create returns better things
         d.addCallback(lambda object_id: self.write_object({"id": object_id}))
         d.addErrback(self.raise_err, 500, "Failed to create object.")
         return d
