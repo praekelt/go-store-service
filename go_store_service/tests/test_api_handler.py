@@ -18,7 +18,7 @@ from go_store_service.api_handler import (
 from go_store_service.tests.helpers import HandlerHelper, AppHelper
 
 
-class TestError(Exception):
+class DummyError(Exception):
     """
     Exception for use in tests.
     """
@@ -101,14 +101,14 @@ class TestBaseHandler(TestCase):
 
     def test_raise_err(self):
         handler = self.handler_helper.mk_handler()
-        f = Failure(TestError("Moop"))
+        f = Failure(DummyError("Moop"))
         try:
             handler.raise_err(f, 500, "Eep")
         except HTTPError, err:
             pass
         self.assertEqual(err.status_code, 500)
         self.assertEqual(err.reason, "Eep")
-        [err] = self.flushLoggedErrors(TestError)
+        [err] = self.flushLoggedErrors(DummyError)
         self.assertEqual(err, f)
 
     @inlineCallbacks
