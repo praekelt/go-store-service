@@ -8,7 +8,8 @@ from vumi.tests.helpers import VumiTestCase, PersistenceHelper
 from zope.interface.verify import verifyObject
 
 from go_store_service.collections import (
-    InMemoryCollectionBackend, defer_async, RiakCollectionBackend)
+    InMemoryCollectionBackend, defer_async, RiakCollectionBackend,
+    InMemoryCollection)
 from go_store_service.interfaces import ICollection, IStoreBackend
 
 
@@ -433,3 +434,22 @@ class TestRiakStore(VumiTestCase, CommonStoreTests):
 
         checked_keys = yield gatherResults([check_key(key) for key in keys])
         returnValue([key for key in checked_keys if key is not None])
+
+
+class TestInMemoryCollection(TestCase):
+    """
+    Tests for the parts of InMemoryCollection that are not covered by
+    TestInMemoryStore.
+    """
+
+    def test_default_backend_is_dict(self):
+        collection = InMemoryCollection({'foo': 'bar'}, None)
+        self.assertEqual(collection._data, {'foo': 'bar'})
+
+    def test_subclass_with_custom_backend(self):
+        class MyCollection(InMemoryCollection):
+            def _get_data_dict(self):
+                return self._backend['data']
+
+        collection = MyCollection({'data': {'foo': 'bar'}}, None)
+        self.assertEqual(collection._data, {'foo': 'bar'})

@@ -168,122 +168,150 @@ def defer_async(value, reactor=None):
 
 
 @implementer(ICollection)
-class InMemoryStoreCollection(object):
+class InMemoryCollection(object):
     """
-    A collection of stores belonging to an owner.
-    Forgets things easily.
+    A Collection implementation backed by an in-memory dict.
     """
 
     def __init__(self, backend, owner_id, reactor=None):
         self._backend = backend
         self.owner_id = owner_id
         self.reactor = reactor
-        self._stores = backend.owner_stores(owner_id)
+        self._data = self._get_data_dict()
 
     def _defer(self, value):
+        """
+        Return a Deferred that is fired asynchronously.
+        """
         return defer_async(value, self.reactor)
+
+    def _get_data_dict(self):
+        """
+        Get the data dict from the backend. This should be overridden in
+        subclasses that don't use the data dict as the backend directly.
+        """
+        return self._backend
+
+    def _id_to_key(self, object_id):
+        """
+        Convert object_id into a key for the internal datastore. This should be
+        overridden in subclasses that don't use object_id as the key.
+        """
+        return object_id
+
+    def _key_to_id(self, key):
+        """
+        Convert an internal datastore key into an object_id. This should be
+        overridden in subclasses that don't use object_id as the key.
+        """
+        return key
+
+    def _is_my_key(self, key):
+        """
+        Returns True if the key belongs to this store, False otherwise. This
+        should be overridden in subclasses that only operate on a subset of the
+        keys in the backend datastore.
+        """
+        return True
 
     def _set_data(self, object_id, data):
         # TODO: Get 'id' out of object data.
-        store_data = data.copy()
-        store_data['id'] = object_id
-        self._stores[object_id] = json.dumps(store_data)
+        row_data = data.copy()
+        row_data['id'] = object_id
+        self._data[self._id_to_key(object_id)] = json.dumps(row_data)
 
     def _get_data(self, object_id):
-        data = self._stores.get(object_id, None)
+        data = self._data.get(self._id_to_key(object_id), None)
         if data is not None:
             data = json.loads(data)
         return data
 
+    def _get_keys(self):
+        return [
+            self._key_to_id(key) for key in self._data
+            if self._is_my_key(key)]
+
     def all_keys(self):
-        return self._defer(self._stores.keys())
+        return self._defer(self._get_keys())
 
     def all(self):
-        return self._defer(self._get_data(key) for key in self._stores)
+        return self._defer([
+            self._get_data(object_id) for object_id in self._get_keys()])
 
     def get(self, object_id):
         return self._defer(self._get_data(object_id))
 
     def create(self, object_id, data):
+        assert 'id' not in data  # TODO: Something better than assert.
         if object_id is None:
             object_id = uuid4().hex
-        assert 'id' not in data  # TODO: Something better than assert.
         self._set_data(object_id, data)
         return self._defer(object_id)
 
     def update(self, object_id, data):
         assert object_id is not None  # TODO: Something better than assert.
-        assert object_id in self._stores
+        assert self._id_to_key(object_id) in self._data
         self._set_data(object_id, data)
         return self._defer(self._get_data(object_id))
 
     def delete(self, object_id):
-        # TODO: Something about row data?
         data = self._get_data(object_id)
-        self._stores.pop(object_id, None)
+        self._data.pop(self._id_to_key(object_id), None)
         return self._defer(data)
 
 
 @implementer(ICollection)
-class InMemoryRowCollection(object):
+class InMemoryStoreCollection(InMemoryCollection):
+    """
+    A collection of stores belonging to an owner.
+    Forgets things easily.
+    """
+
+    def _get_data_dict(self):
+        """
+        Get the data dict from the backend.
+        """
+        return self._backend._owner_stores(self.owner_id)
+
+
+@implementer(ICollection)
+class InMemoryRowCollection(InMemoryCollection):
     """
     A table of rows belonging to a store.
     Forgets things easily.
     """
 
     def __init__(self, backend, owner_id, store_id, reactor=None):
-        self._backend = backend
-        self.owner_id = owner_id
+        super(InMemoryRowCollection, self).__init__(
+            backend, owner_id, reactor=reactor)
         self.store_id = store_id
-        self.reactor = reactor
-        self._rows = backend.owner_rows(owner_id)
 
-    def _defer(self, value):
-        return defer_async(value, self.reactor)
+    def _get_data_dict(self):
+        """
+        Get the data dict from the backend.
+        """
+        return self._backend._owner_rows(self.owner_id)
 
-    def _key(self, object_id):
+    def _id_to_key(self, object_id):
+        """
+        Convert object_id into a key for the internal datastore.
+        """
         return (self.store_id, object_id)
 
-    def _set_data(self, object_id, data):
-        # TODO: Get 'id' out of object data.
-        row_data = data.copy()
-        row_data['id'] = object_id
-        self._rows[self._key(object_id)] = json.dumps(row_data)
+    def _key_to_id(self, key):
+        """
+        Convert an internal datastore key into an object_id.
+        """
+        store_id, object_id = key
+        assert store_id == self.store_id
+        return object_id
 
-    def _get_data(self, object_id):
-        data = self._rows.get(self._key(object_id), None)
-        if data is not None:
-            data = json.loads(data)
-        return data
-
-    def all_keys(self):
-        return self._defer([key for store_id, key in self._rows
-                            if store_id == self.store_id])
-
-    def all(self):
-        return self._defer([self._get_data(key) for store_id, key in self._rows
-                            if store_id == self.store_id])
-
-    def get(self, object_id):
-        return self._defer(self._get_data(object_id))
-
-    def create(self, object_id, data):
-        assert 'id' not in data  # TODO: Something better than assert.
-        if object_id is None:
-            object_id = uuid4().hex
-        self._set_data(object_id, data)
-        return self._defer(object_id)
-
-    def update(self, object_id, data):
-        assert object_id is not None  # TODO: Something better than assert.
-        assert self._key(object_id) in self._rows
-        self._set_data(object_id, data)
-        return self._defer(self._get_data(object_id))
-
-    def delete(self, object_id):
-        data = self._get_data(object_id)
-        self._rows.pop(self._key(object_id), None)
-        return self._defer(data)
+    def _is_my_key(self, key):
+        """
+        Exclude keys for rows belonging to different stores.
+        """
+        store_id, _object_id = key
+        return store_id == self.store_id
 
 
 @implementer(IStoreBackend)
@@ -293,10 +321,10 @@ class InMemoryCollectionBackend(object):
         self._stores.setdefault('stores', {})
         self._stores.setdefault('rows', {})
 
-    def owner_stores(self, owner_id):
+    def _owner_stores(self, owner_id):
         return self._stores['stores'].setdefault(owner_id, {})
 
-    def owner_rows(self, owner_id):
+    def _owner_rows(self, owner_id):
         return self._stores['rows'].setdefault(owner_id, {})
 
     def get_store_collection(self, owner_id):
