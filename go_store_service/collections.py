@@ -1,4 +1,4 @@
-import json
+from copy import deepcopy
 from uuid import uuid4
 
 from twisted.internet.defer import Deferred, inlineCallbacks, returnValue
@@ -178,6 +178,13 @@ class InMemoryCollection(object):
         self.reactor = reactor
         self._data = self._get_data_dict()
 
+    @property
+    def internal_data_for_tests(self):
+        """
+        This property is for use in tests. It should not be used elsewhere.
+        """
+        return self._data
+
     def _defer(self, value):
         """
         Return a Deferred that is fired asynchronously.
@@ -217,13 +224,11 @@ class InMemoryCollection(object):
         # TODO: Get 'id' out of object data.
         row_data = data.copy()
         row_data['id'] = object_id
-        self._data[self._id_to_key(object_id)] = json.dumps(row_data)
+        self._data[self._id_to_key(object_id)] = deepcopy(row_data)
 
     def _get_data(self, object_id):
         data = self._data.get(self._id_to_key(object_id), None)
-        if data is not None:
-            data = json.loads(data)
-        return data
+        return deepcopy(data)
 
     def _get_keys(self):
         return [

@@ -444,7 +444,7 @@ class TestInMemoryCollection(TestCase):
 
     def test_default_backend_is_dict(self):
         collection = InMemoryCollection({'foo': 'bar'})
-        self.assertEqual(collection._data, {'foo': 'bar'})
+        self.assertEqual(collection.internal_data_for_tests, {'foo': 'bar'})
 
     def test_subclass_with_custom_backend(self):
         class MyCollection(InMemoryCollection):
@@ -452,4 +452,4 @@ class TestInMemoryCollection(TestCase):
                 return self._backend['data']
 
         collection = MyCollection({'data': {'foo': 'bar'}})
-        self.assertEqual(collection._data, {'foo': 'bar'})
+        self.assertEqual(collection.internal_data_for_tests, {'foo': 'bar'})
