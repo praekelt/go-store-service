@@ -173,9 +173,8 @@ class InMemoryCollection(object):
     A Collection implementation backed by an in-memory dict.
     """
 
-    def __init__(self, backend, owner_id, reactor=None):
+    def __init__(self, backend, reactor=None):
         self._backend = backend
-        self.owner_id = owner_id
         self.reactor = reactor
         self._data = self._get_data_dict()
 
@@ -267,6 +266,10 @@ class InMemoryStoreCollection(InMemoryCollection):
     Forgets things easily.
     """
 
+    def __init__(self, backend, owner_id, reactor=None):
+        self.owner_id = owner_id
+        super(InMemoryStoreCollection, self).__init__(backend, reactor=reactor)
+
     def _get_data_dict(self):
         """
         Get the data dict from the backend.
@@ -282,9 +285,9 @@ class InMemoryRowCollection(InMemoryCollection):
     """
 
     def __init__(self, backend, owner_id, store_id, reactor=None):
-        super(InMemoryRowCollection, self).__init__(
-            backend, owner_id, reactor=reactor)
+        self.owner_id = owner_id
         self.store_id = store_id
+        super(InMemoryRowCollection, self).__init__(backend, reactor=reactor)
 
     def _get_data_dict(self):
         """
