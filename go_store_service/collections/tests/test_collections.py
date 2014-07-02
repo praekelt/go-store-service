@@ -2,13 +2,12 @@ from functools import wraps
 
 from twisted.internet.defer import (
     inlineCallbacks, returnValue, gatherResults, maybeDeferred)
-from twisted.internet.task import Clock
-from twisted.trial.unittest import TestCase, SkipTest
+from twisted.trial.unittest import SkipTest
 from vumi.tests.helpers import VumiTestCase, PersistenceHelper
 from zope.interface.verify import verifyObject
 
 from go_store_service.collections import (
-    InMemoryCollectionBackend, defer_async, RiakCollectionBackend)
+    InMemoryCollectionBackend, RiakCollectionBackend)
 from go_store_service.interfaces import ICollection, IStoreBackend
 
 
@@ -390,17 +389,9 @@ class CommonStoreTests(object):
         self.assertEqual(row_data, {'id': row_key, 'foo': 'bar'})
 
 
-class TestInMemoryStore(TestCase, CommonStoreTests):
+class TestInMemoryStore(VumiTestCase, CommonStoreTests):
     def make_store_backend(self):
         return InMemoryCollectionBackend({})
-
-    def test_defer_async(self):
-        clock = Clock()
-        d = defer_async('foo', reactor=clock)
-        self.assertEqual(d.called, False)
-        clock.advance(0)
-        self.assertEqual(d.called, True)
-        self.assertEqual(d.result, 'foo')
 
 
 class TestRiakStore(VumiTestCase, CommonStoreTests):
