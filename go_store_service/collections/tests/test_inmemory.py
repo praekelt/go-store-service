@@ -1,7 +1,7 @@
 from twisted.internet.task import Clock
 from twisted.trial.unittest import TestCase
 
-from go_store_service.collections.inmemory_collections import defer_async
+from go_store_service.collections.inmemory import defer_async
 
 
 class TestInMemoryCollectionMisc(TestCase):
