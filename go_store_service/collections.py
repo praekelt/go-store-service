@@ -176,27 +176,12 @@ class InMemoryCollection(object):
     def __init__(self, backend, reactor=None):
         self._backend = backend
         self.reactor = reactor
-        self._data = self._get_data_dict()
-
-    @property
-    def internal_data_for_tests(self):
-        """
-        This property is for use in tests. It should not be used elsewhere.
-        """
-        return self._data
 
     def _defer(self, value):
         """
         Return a Deferred that is fired asynchronously.
         """
         return defer_async(value, self.reactor)
-
-    def _get_data_dict(self):
-        """
-        Get the data dict from the backend. This should be overridden in
-        subclasses that don't use the data dict as the backend directly.
-        """
-        return self._backend
 
     def _id_to_key(self, object_id):
         """
@@ -224,15 +209,15 @@ class InMemoryCollection(object):
         # TODO: Get 'id' out of object data.
         row_data = data.copy()
         row_data['id'] = object_id
-        self._data[self._id_to_key(object_id)] = deepcopy(row_data)
+        self._backend[self._id_to_key(object_id)] = deepcopy(row_data)
 
     def _get_data(self, object_id):
-        data = self._data.get(self._id_to_key(object_id), None)
+        data = self._backend.get(self._id_to_key(object_id), None)
         return deepcopy(data)
 
     def _get_keys(self):
         return [
-            self._key_to_id(key) for key in self._data
+            self._key_to_id(key) for key in self._backend
             if self._is_my_key(key)]
 
     def all_keys(self):
@@ -254,13 +239,13 @@ class InMemoryCollection(object):
 
     def update(self, object_id, data):
         assert object_id is not None  # TODO: Something better than assert.
-        assert self._id_to_key(object_id) in self._data
+        assert self._id_to_key(object_id) in self._backend
         self._set_data(object_id, data)
         return self._defer(self._get_data(object_id))
 
     def delete(self, object_id):
         data = self._get_data(object_id)
-        self._data.pop(self._id_to_key(object_id), None)
+        self._backend.pop(self._id_to_key(object_id), None)
         return self._defer(data)
 
 
@@ -275,12 +260,6 @@ class InMemoryStoreCollection(InMemoryCollection):
         self.owner_id = owner_id
         super(InMemoryStoreCollection, self).__init__(backend, reactor=reactor)
 
-    def _get_data_dict(self):
-        """
-        Get the data dict from the backend.
-        """
-        return self._backend._owner_stores(self.owner_id)
-
 
 @implementer(ICollection)
 class InMemoryRowCollection(InMemoryCollection):
@@ -293,12 +272,6 @@ class InMemoryRowCollection(InMemoryCollection):
         self.owner_id = owner_id
         self.store_id = store_id
         super(InMemoryRowCollection, self).__init__(backend, reactor=reactor)
-
-    def _get_data_dict(self):
-        """
-        Get the data dict from the backend.
-        """
-        return self._backend._owner_rows(self.owner_id)
 
     def _id_to_key(self, object_id):
         """
@@ -329,14 +302,10 @@ class InMemoryCollectionBackend(object):
         self._stores.setdefault('stores', {})
         self._stores.setdefault('rows', {})
 
-    def _owner_stores(self, owner_id):
-        return self._stores['stores'].setdefault(owner_id, {})
-
-    def _owner_rows(self, owner_id):
-        return self._stores['rows'].setdefault(owner_id, {})
-
     def get_store_collection(self, owner_id):
-        return InMemoryStoreCollection(self, owner_id)
+        stores = self._stores['stores'].setdefault(owner_id, {})
+        return InMemoryStoreCollection(stores, owner_id)
 
     def get_row_collection(self, owner_id, store_id):
-        return InMemoryRowCollection(self, owner_id, store_id)
+        rows = self._stores['rows'].setdefault(owner_id, {})
+        return InMemoryRowCollection(rows, owner_id, store_id)
