@@ -173,8 +173,8 @@ class InMemoryCollection(object):
     A Collection implementation backed by an in-memory dict.
     """
 
-    def __init__(self, backend, reactor=None):
-        self._backend = backend
+    def __init__(self, data, reactor=None):
+        self._data = data
         self.reactor = reactor
 
     def _defer(self, value):
@@ -209,15 +209,15 @@ class InMemoryCollection(object):
         # TODO: Get 'id' out of object data.
         row_data = data.copy()
         row_data['id'] = object_id
-        self._backend[self._id_to_key(object_id)] = deepcopy(row_data)
+        self._data[self._id_to_key(object_id)] = deepcopy(row_data)
 
     def _get_data(self, object_id):
-        data = self._backend.get(self._id_to_key(object_id), None)
+        data = self._data.get(self._id_to_key(object_id), None)
         return deepcopy(data)
 
     def _get_keys(self):
         return [
-            self._key_to_id(key) for key in self._backend
+            self._key_to_id(key) for key in self._data
             if self._is_my_key(key)]
 
     def all_keys(self):
@@ -239,13 +239,13 @@ class InMemoryCollection(object):
 
     def update(self, object_id, data):
         assert object_id is not None  # TODO: Something better than assert.
-        assert self._id_to_key(object_id) in self._backend
+        assert self._id_to_key(object_id) in self._data
         self._set_data(object_id, data)
         return self._defer(self._get_data(object_id))
 
     def delete(self, object_id):
         data = self._get_data(object_id)
-        self._backend.pop(self._id_to_key(object_id), None)
+        self._data.pop(self._id_to_key(object_id), None)
         return self._defer(data)
 
 
@@ -256,9 +256,9 @@ class InMemoryStoreCollection(InMemoryCollection):
     Forgets things easily.
     """
 
-    def __init__(self, backend, owner_id, reactor=None):
+    def __init__(self, data, owner_id, reactor=None):
         self.owner_id = owner_id
-        super(InMemoryStoreCollection, self).__init__(backend, reactor=reactor)
+        super(InMemoryStoreCollection, self).__init__(data, reactor=reactor)
 
 
 @implementer(ICollection)
@@ -268,10 +268,10 @@ class InMemoryRowCollection(InMemoryCollection):
     Forgets things easily.
     """
 
-    def __init__(self, backend, owner_id, store_id, reactor=None):
+    def __init__(self, data, owner_id, store_id, reactor=None):
         self.owner_id = owner_id
         self.store_id = store_id
-        super(InMemoryRowCollection, self).__init__(backend, reactor=reactor)
+        super(InMemoryRowCollection, self).__init__(data, reactor=reactor)
 
     def _id_to_key(self, object_id):
         """
