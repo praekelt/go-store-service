@@ -170,7 +170,50 @@ class CommonStoreTests(object):
         self.assertEqual(all_store_data, [store_data])
 
     @inlineCallbacks
-    def test_store_collection_create_no_id_no_data(self):
+    def test_store_collection_get_missing_object(self):
+        """
+        Asking for an object that does not exist returns None.
+        """
+        stores = yield self.get_empty_store_collection()
+
+        store_data = yield stores.get('missing')
+        self.assertEqual(store_data, None)
+
+    @inlineCallbacks
+    def test_store_collection_create_and_get_null_data(self):
+        """
+        An object with data=None may be created and retrieved.
+        """
+        stores = yield self.get_empty_store_collection()
+
+        store_key = yield stores.create(None, None)
+        store_data = yield stores.get(store_key)
+        self.assertEqual(store_data, {'id': store_key, 'data': None})
+
+    @inlineCallbacks
+    def test_store_collection_create_and_get_string_data(self):
+        """
+        An object with string data may be created and retrieved.
+        """
+        stores = yield self.get_empty_store_collection()
+
+        store_key = yield stores.create(None, 'foo')
+        store_data = yield stores.get(store_key)
+        self.assertEqual(store_data, {'id': store_key, 'data': 'foo'})
+
+    @inlineCallbacks
+    def test_store_collection_create_and_get_dict_data(self):
+        """
+        An object with dict data may be created and retrieved.
+        """
+        stores = yield self.get_empty_store_collection()
+
+        store_key = yield stores.create(None, {'foo': 42})
+        store_data = yield stores.get(store_key)
+        self.assertEqual(store_data, {'id': store_key, 'data': {'foo': 42}})
+
+    @inlineCallbacks
+    def test_store_collection_create_no_id(self):
         """
         Creating an object with no object_id should generate one.
         """
@@ -178,10 +221,10 @@ class CommonStoreTests(object):
 
         store_key = yield stores.create(None, {})
         store_data = yield stores.get(store_key)
-        self.assertEqual(store_data, {'id': store_key})
+        self.assertEqual(store_data, {'id': store_key, 'data': {}})
 
     @inlineCallbacks
-    def test_store_collection_create_with_id_no_data(self):
+    def test_store_collection_create_with_id(self):
         """
         Creating an object with an object_id should not generate a new one.
         """
@@ -190,17 +233,7 @@ class CommonStoreTests(object):
         store_key = yield stores.create('key', {})
         self.assertEqual(store_key, 'key')
         store_data = yield stores.get(store_key)
-        self.assertEqual(store_data, {'id': 'key'})
-
-    @inlineCallbacks
-    def test_store_collection_create_no_id_with_data(self):
-        stores = yield self.get_empty_store_collection()
-
-        store_key = yield stores.create(None, {'foo': 'bar'})
-        store_keys = yield self.filtered_all_keys(stores)
-        self.assertEqual(store_keys, [store_key])
-        store_data = yield stores.get(store_key)
-        self.assertEqual(store_data, {'foo': 'bar', 'id': store_key})
+        self.assertEqual(store_data, {'id': 'key', 'data': {}})
 
     @inlineCallbacks
     def test_store_collection_delete_missing_store(self):
@@ -219,7 +252,7 @@ class CommonStoreTests(object):
         self.ensure_equal(store_keys, [store_key])
 
         store_data = yield stores.delete(store_key)
-        self.assertEqual(store_data, {'id': store_key})
+        self.assertEqual(store_data, {'id': store_key, 'data': {}})
         store_data = yield stores.get(store_key)
         self.assertEqual(store_data, None)
         store_keys = yield self.filtered_all_keys(stores)
@@ -230,13 +263,12 @@ class CommonStoreTests(object):
         stores = yield self.get_empty_store_collection()
         store_key = yield stores.create(None, {})
         store_data = yield stores.get(store_key)
-        self.ensure_equal(store_data, {'id': store_key})
+        self.ensure_equal(store_data, {'id': store_key, 'data': {}})
 
-        store_data = yield stores.update(
-            store_key, {'id': store_key, 'foo': 'bar'})
-        self.assertEqual(store_data, {'id': store_key, 'foo': 'bar'})
+        store_data = yield stores.update(store_key, {'foo': 'bar'})
+        self.assertEqual(store_data, {'id': store_key, 'data': {'foo': 'bar'}})
         store_data = yield stores.get(store_key)
-        self.assertEqual(store_data, {'id': store_key, 'foo': 'bar'})
+        self.assertEqual(store_data, {'id': store_key, 'data': {'foo': 'bar'}})
 
     ##############################################
     # Tests for row collection functionality.
@@ -322,7 +354,50 @@ class CommonStoreTests(object):
         self.assertEqual(all_row_data, [])
 
     @inlineCallbacks
-    def test_row_collection_create_no_id_no_data(self):
+    def test_row_collection_get_missing_object(self):
+        """
+        Asking for an object that does not exist returns None.
+        """
+        rows = yield self.get_empty_row_collection()
+
+        row_data = yield rows.get('missing')
+        self.assertEqual(row_data, None)
+
+    @inlineCallbacks
+    def test_row_collection_create_and_get_null_data(self):
+        """
+        An object with data=None may be created and retrieved.
+        """
+        rows = yield self.get_empty_row_collection()
+
+        row_key = yield rows.create(None, None)
+        row_data = yield rows.get(row_key)
+        self.assertEqual(row_data, {'id': row_key, 'data': None})
+
+    @inlineCallbacks
+    def test_row_collection_create_and_get_string_data(self):
+        """
+        An object with string data may be created and retrieved.
+        """
+        rows = yield self.get_empty_row_collection()
+
+        row_key = yield rows.create(None, 'foo')
+        row_data = yield rows.get(row_key)
+        self.assertEqual(row_data, {'id': row_key, 'data': 'foo'})
+
+    @inlineCallbacks
+    def test_row_collection_create_and_get_dict_data(self):
+        """
+        An object with dict data may be created and retrieved.
+        """
+        rows = yield self.get_empty_row_collection()
+
+        row_key = yield rows.create(None, {'foo': 42})
+        row_data = yield rows.get(row_key)
+        self.assertEqual(row_data, {'id': row_key, 'data': {'foo': 42}})
+
+    @inlineCallbacks
+    def test_row_collection_create_no_id(self):
         """
         Creating an object with no object_id should generate one.
         """
@@ -330,10 +405,10 @@ class CommonStoreTests(object):
 
         row_key = yield rows.create(None, {})
         row_data = yield rows.get(row_key)
-        self.assertEqual(row_data, {'id': row_key})
+        self.assertEqual(row_data, {'id': row_key, 'data': {}})
 
     @inlineCallbacks
-    def test_row_collection_create_with_id_no_data(self):
+    def test_row_collection_create_with_id(self):
         """
         Creating an object with an object_id should not generate a new one.
         """
@@ -342,17 +417,7 @@ class CommonStoreTests(object):
         row_key = yield rows.create('key', {})
         self.assertEqual(row_key, 'key')
         row_data = yield rows.get(row_key)
-        self.assertEqual(row_data, {'id': 'key'})
-
-    @inlineCallbacks
-    def test_row_collection_create_no_id_with_data(self):
-        rows = yield self.get_empty_row_collection()
-
-        row_key = yield rows.create(None, {'foo': 'bar'})
-        row_keys = yield self.filtered_all_keys(rows)
-        self.assertEqual(row_keys, [row_key])
-        row_data = yield rows.get(row_key)
-        self.assertEqual(row_data, {'foo': 'bar', 'id': row_key})
+        self.assertEqual(row_data, {'id': 'key', 'data': {}})
 
     @inlineCallbacks
     def test_row_collection_delete_missing_row(self):
@@ -371,7 +436,7 @@ class CommonStoreTests(object):
         self.ensure_equal(row_keys, [row_key])
 
         row_data = yield rows.delete(row_key)
-        self.assertEqual(row_data, {'id': row_key})
+        self.assertEqual(row_data, {'id': row_key, 'data': {}})
         row_keys = yield self.filtered_all_keys(rows)
         self.assertEqual(row_keys, [])
 
@@ -380,13 +445,13 @@ class CommonStoreTests(object):
         rows = yield self.get_empty_row_collection()
         row_key = yield rows.create(None, {})
         row_data = yield rows.get(row_key)
-        self.ensure_equal(row_data, {'id': row_key})
+        self.ensure_equal(row_data, {'id': row_key, 'data': {}})
 
         row_data = yield rows.update(
-            row_key, {'id': row_key, 'foo': 'bar'})
-        self.assertEqual(row_data, {'id': row_key, 'foo': 'bar'})
+            row_key, {'foo': 'bar'})
+        self.assertEqual(row_data, {'id': row_key, 'data': {'foo': 'bar'}})
         row_data = yield rows.get(row_key)
-        self.assertEqual(row_data, {'id': row_key, 'foo': 'bar'})
+        self.assertEqual(row_data, {'id': row_key, 'data': {'foo': 'bar'}})
 
 
 class TestInMemoryStore(VumiTestCase, CommonStoreTests):

@@ -88,8 +88,8 @@ class TestBaseHandler(TestCase):
 class TestCollectionHandler(TestCase):
     def setUp(self):
         self.collection_data = {
-            "obj1": {"id": "obj1"},
-            "obj2": {"id": "obj2"},
+            "obj1": {"foo": "bar"},
+            "obj2": "baz",
         }
         self.collection = InMemoryCollection(self.collection_data)
         self.collection_factory = lambda: self.collection
@@ -112,23 +112,23 @@ class TestCollectionHandler(TestCase):
     @inlineCallbacks
     def test_get(self):
         data = yield self.app_helper.get('/root', parser='json_lines')
-        self.assertEqual(data, [{"id": "obj1"}, {"id": "obj2"}])
+        self.assertEqual(data, [
+            {"id": "obj1", "data": {"foo": "bar"}},
+            {"id": "obj2", "data": "baz"}])
 
     @inlineCallbacks
     def test_post(self):
         data = yield self.app_helper.post(
-            '/root', data=json.dumps({"foo": "bar"}), parser='json')
+            '/root', data=json.dumps({"hello": "world"}), parser='json')
         self.assertEqual(data.keys(), ["id"])
-        self.assertEqual(
-            self.collection_data[data["id"]],
-            {"foo": "bar", "id": data["id"]})
+        self.assertEqual(self.collection_data[data["id"]], {"hello": "world"})
 
 
 class TestElementHandler(TestCase):
     def setUp(self):
         self.collection_data = {
-            "obj1": {"id": "obj1"},
-            "obj2": {"id": "obj2"},
+            "obj1": {"foo": "bar"},
+            "obj2": "baz",
         }
         self.collection = InMemoryCollection(self.collection_data)
         self.collection_factory = lambda: self.collection
@@ -154,19 +154,19 @@ class TestElementHandler(TestCase):
     def test_get(self):
         data = yield self.app_helper.get(
             '/root/obj1', parser='json')
-        self.assertEqual(data, {"id": "obj1"})
+        self.assertEqual(data, {"id": "obj1", "data": {"foo": "bar"}})
 
     @inlineCallbacks
     def test_put(self):
-        self.assertEqual(self.collection_data["obj2"], {"id": "obj2"})
+        self.assertEqual(self.collection_data["obj2"], "baz")
         data = yield self.app_helper.put(
             '/root/obj2',
-            data=json.dumps({"id": "obj2", "foo": "bar"}),
+            data=json.dumps({"hello": "world"}),
             parser='json')
         self.assertEqual(data, {"success": True})
         self.assertEqual(
             self.collection_data["obj2"],
-            {"id": "obj2", "foo": "bar"})
+            {"hello": "world"})
 
     @inlineCallbacks
     def test_delete(self):
