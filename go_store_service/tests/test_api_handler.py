@@ -1,74 +1,22 @@
-import copy
 import json
-import itertools
+
 from twisted.trial.unittest import TestCase
 from twisted.python.failure import Failure
-
-from zope.interface import implementer
-
 from twisted.internet.defer import inlineCallbacks
 
 from cyclone.web import HTTPError
 
-from go_store_service.interfaces import ICollection
-from go_store_service.collections import defer_async
+from go_store_service.collections import InMemoryCollection
 from go_store_service.api_handler import (
     BaseHandler, CollectionHandler, ElementHandler,
     create_urlspec_regex, ApiApplication)
 from go_store_service.tests.helpers import HandlerHelper, AppHelper
 
 
-class TestError(Exception):
+class DummyError(Exception):
     """
     Exception for use in tests.
     """
-
-
-@implementer(ICollection)
-class DummyCollection(object):
-    """
-    In memory collection for testing.
-    """
-
-    def __init__(self, objects, reactor=None):
-        self._objects = objects
-        self._id_counter = itertools.count()
-        self._reactor = reactor
-
-    @property
-    def objects(self):
-        return copy.deepcopy(self._objects)
-
-    def _defer(self, value):
-        return defer_async(value, self._reactor)
-
-    def all_keys(self):
-        return self._defer(self._objects.keys())
-
-    def all(self):
-        return self._defer(self._objects.values())
-
-    def get(self, object_id):
-        return self._defer(self._objects[object_id])
-
-    def create(self, object_id, data):
-        assert object_id not in self._objects
-        if object_id is None:
-            object_id = "id%s" % (self._id_counter.next(),)
-        self._objects[object_id] = data.copy()
-        return self._defer(object_id)
-
-    def update(self, object_id, data):
-        assert object_id is not None
-        assert object_id in self._objects
-        self._objects[object_id] = data.copy()
-        return self._defer(self._objects[object_id])
-
-    def delete(self, object_id):
-        assert object_id is not None
-        assert object_id in self._objects
-        data = self._objects.pop(object_id)
-        return self._defer(data)
 
 
 class TestCreateUrlspecRegex(TestCase):
@@ -101,14 +49,14 @@ class TestBaseHandler(TestCase):
 
     def test_raise_err(self):
         handler = self.handler_helper.mk_handler()
-        f = Failure(TestError("Moop"))
+        f = Failure(DummyError("Moop"))
         try:
             handler.raise_err(f, 500, "Eep")
         except HTTPError, err:
             pass
         self.assertEqual(err.status_code, 500)
         self.assertEqual(err.reason, "Eep")
-        [err] = self.flushLoggedErrors(TestError)
+        [err] = self.flushLoggedErrors(DummyError)
         self.assertEqual(err, f)
 
     @inlineCallbacks
@@ -139,10 +87,11 @@ class TestBaseHandler(TestCase):
 
 class TestCollectionHandler(TestCase):
     def setUp(self):
-        self.collection = DummyCollection({
+        self.collection_data = {
             "obj1": {"id": "obj1"},
             "obj2": {"id": "obj2"},
-        })
+        }
+        self.collection = InMemoryCollection(self.collection_data)
         self.collection_factory = lambda: self.collection
         self.handler_helper = HandlerHelper(
             CollectionHandler,
@@ -169,16 +118,19 @@ class TestCollectionHandler(TestCase):
     def test_post(self):
         data = yield self.app_helper.post(
             '/root', data=json.dumps({"foo": "bar"}), parser='json')
-        self.assertEqual(data, {"id": "id0"})
-        self.assertEqual(self.collection.objects["id0"], {"foo": "bar"})
+        self.assertEqual(data.keys(), ["id"])
+        self.assertEqual(
+            self.collection_data[data["id"]],
+            {"foo": "bar", "id": data["id"]})
 
 
 class TestElementHandler(TestCase):
     def setUp(self):
-        self.collection = DummyCollection({
+        self.collection_data = {
             "obj1": {"id": "obj1"},
             "obj2": {"id": "obj2"},
-        })
+        }
+        self.collection = InMemoryCollection(self.collection_data)
         self.collection_factory = lambda: self.collection
         self.handler_helper = HandlerHelper(
             ElementHandler,
@@ -206,23 +158,23 @@ class TestElementHandler(TestCase):
 
     @inlineCallbacks
     def test_put(self):
-        self.assertEqual(self.collection.objects["obj2"],
-                         {"id": "obj2"})
+        self.assertEqual(self.collection_data["obj2"], {"id": "obj2"})
         data = yield self.app_helper.put(
             '/root/obj2',
             data=json.dumps({"id": "obj2", "foo": "bar"}),
             parser='json')
         self.assertEqual(data, {"success": True})
-        self.assertEqual(self.collection.objects["obj2"],
-                         {"id": "obj2", "foo": "bar"})
+        self.assertEqual(
+            self.collection_data["obj2"],
+            {"id": "obj2", "foo": "bar"})
 
     @inlineCallbacks
     def test_delete(self):
-        self.assertTrue("obj1" in self.collection.objects)
+        self.assertTrue("obj1" in self.collection_data)
         data = yield self.app_helper.delete(
             '/root/obj1', parser='json')
         self.assertEqual(data, {"success": True})
-        self.assertTrue("obj1" not in self.collection.objects)
+        self.assertTrue("obj1" not in self.collection_data)
 
 
 class TestApiApplication(TestCase):
