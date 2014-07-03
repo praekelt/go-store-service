@@ -163,8 +163,7 @@ class CommonStoreTests(object):
         """
         backend = self.get_store_backend()
         stores = yield backend.get_store_collection("me")
-        store_key = yield stores.create(None, {})
-        store_data = yield stores.get(store_key)
+        store_data = yield stores.create(None, {})
 
         all_store_data = yield self.filtered_all(stores)
         self.assertEqual(all_store_data, [store_data])
@@ -186,9 +185,12 @@ class CommonStoreTests(object):
         """
         stores = yield self.get_empty_store_collection()
 
-        store_key = yield stores.create(None, None)
-        store_data = yield stores.get(store_key)
+        store_data = yield stores.create(None, None)
+        store_key = store_data["id"]
         self.assertEqual(store_data, {'id': store_key, 'data': None})
+
+        got_data = yield stores.get(store_key)
+        self.assertEqual(store_data, got_data)
 
     @inlineCallbacks
     def test_store_collection_create_and_get_string_data(self):
@@ -197,9 +199,12 @@ class CommonStoreTests(object):
         """
         stores = yield self.get_empty_store_collection()
 
-        store_key = yield stores.create(None, 'foo')
-        store_data = yield stores.get(store_key)
+        store_data = yield stores.create(None, 'foo')
+        store_key = store_data["id"]
         self.assertEqual(store_data, {'id': store_key, 'data': 'foo'})
+
+        got_data = yield stores.get(store_key)
+        self.assertEqual(store_data, got_data)
 
     @inlineCallbacks
     def test_store_collection_create_and_get_dict_data(self):
@@ -208,9 +213,12 @@ class CommonStoreTests(object):
         """
         stores = yield self.get_empty_store_collection()
 
-        store_key = yield stores.create(None, {'foo': 42})
-        store_data = yield stores.get(store_key)
+        store_data = yield stores.create(None, {'foo': 42})
+        store_key = store_data["id"]
         self.assertEqual(store_data, {'id': store_key, 'data': {'foo': 42}})
+
+        got_data = yield stores.get(store_key)
+        self.assertEqual(store_data, got_data)
 
     @inlineCallbacks
     def test_store_collection_create_no_id(self):
@@ -219,9 +227,12 @@ class CommonStoreTests(object):
         """
         stores = yield self.get_empty_store_collection()
 
-        store_key = yield stores.create(None, {})
-        store_data = yield stores.get(store_key)
+        store_data = yield stores.create(None, {})
+        store_key = store_data["id"]
         self.assertEqual(store_data, {'id': store_key, 'data': {}})
+
+        got_data = yield stores.get(store_key)
+        self.assertEqual(store_data, got_data)
 
     @inlineCallbacks
     def test_store_collection_create_with_id(self):
@@ -230,10 +241,11 @@ class CommonStoreTests(object):
         """
         stores = yield self.get_empty_store_collection()
 
-        store_key = yield stores.create('key', {})
-        self.assertEqual(store_key, 'key')
-        store_data = yield stores.get(store_key)
+        store_data = yield stores.create('key', {})
         self.assertEqual(store_data, {'id': 'key', 'data': {}})
+
+        got_data = yield stores.get('key')
+        self.assertEqual(store_data, got_data)
 
     @inlineCallbacks
     def test_store_collection_delete_missing_store(self):
@@ -247,7 +259,7 @@ class CommonStoreTests(object):
     @inlineCallbacks
     def test_store_collection_delete_existing_store(self):
         stores = yield self.get_empty_store_collection()
-        store_key = yield stores.create(None, {})
+        store_key = (yield stores.create(None, {}))["id"]
         store_keys = yield self.filtered_all_keys(stores)
         self.ensure_equal(store_keys, [store_key])
 
@@ -261,8 +273,8 @@ class CommonStoreTests(object):
     @inlineCallbacks
     def test_store_collection_update(self):
         stores = yield self.get_empty_store_collection()
-        store_key = yield stores.create(None, {})
-        store_data = yield stores.get(store_key)
+        store_data = yield stores.create(None, {})
+        store_key = store_data["id"]
         self.ensure_equal(store_data, {'id': store_key, 'data': {}})
 
         store_data = yield stores.update(store_key, {'foo': 'bar'})
@@ -333,8 +345,7 @@ class CommonStoreTests(object):
         """
         backend = self.get_store_backend()
         rows = yield backend.get_row_collection("me", "store")
-        row_key = yield rows.create(None, {})
-        row_data = yield rows.get(row_key)
+        row_data = yield rows.create(None, {})
 
         all_row_data = yield self.filtered_all(rows)
         self.assertEqual(all_row_data, [row_data])
@@ -370,9 +381,12 @@ class CommonStoreTests(object):
         """
         rows = yield self.get_empty_row_collection()
 
-        row_key = yield rows.create(None, None)
-        row_data = yield rows.get(row_key)
+        row_data = yield rows.create(None, None)
+        row_key = row_data["id"]
         self.assertEqual(row_data, {'id': row_key, 'data': None})
+
+        got_data = yield rows.get(row_key)
+        self.assertEqual(row_data, got_data)
 
     @inlineCallbacks
     def test_row_collection_create_and_get_string_data(self):
@@ -381,9 +395,12 @@ class CommonStoreTests(object):
         """
         rows = yield self.get_empty_row_collection()
 
-        row_key = yield rows.create(None, 'foo')
-        row_data = yield rows.get(row_key)
+        row_data = yield rows.create(None, 'foo')
+        row_key = row_data["id"]
         self.assertEqual(row_data, {'id': row_key, 'data': 'foo'})
+
+        got_data = yield rows.get(row_key)
+        self.assertEqual(row_data, got_data)
 
     @inlineCallbacks
     def test_row_collection_create_and_get_dict_data(self):
@@ -392,9 +409,12 @@ class CommonStoreTests(object):
         """
         rows = yield self.get_empty_row_collection()
 
-        row_key = yield rows.create(None, {'foo': 42})
-        row_data = yield rows.get(row_key)
+        row_data = yield rows.create(None, {'foo': 42})
+        row_key = row_data["id"]
         self.assertEqual(row_data, {'id': row_key, 'data': {'foo': 42}})
+
+        got_data = yield rows.get(row_key)
+        self.assertEqual(row_data, got_data)
 
     @inlineCallbacks
     def test_row_collection_create_no_id(self):
@@ -403,9 +423,12 @@ class CommonStoreTests(object):
         """
         rows = yield self.get_empty_row_collection()
 
-        row_key = yield rows.create(None, {})
-        row_data = yield rows.get(row_key)
+        row_data = yield rows.create(None, {})
+        row_key = row_data["id"]
         self.assertEqual(row_data, {'id': row_key, 'data': {}})
+
+        got_data = yield rows.get(row_key)
+        self.assertEqual(row_data, got_data)
 
     @inlineCallbacks
     def test_row_collection_create_with_id(self):
@@ -414,10 +437,11 @@ class CommonStoreTests(object):
         """
         rows = yield self.get_empty_row_collection()
 
-        row_key = yield rows.create('key', {})
-        self.assertEqual(row_key, 'key')
-        row_data = yield rows.get(row_key)
+        row_data = yield rows.create('key', {})
         self.assertEqual(row_data, {'id': 'key', 'data': {}})
+
+        got_data = yield rows.get('key')
+        self.assertEqual(row_data, got_data)
 
     @inlineCallbacks
     def test_row_collection_delete_missing_row(self):
@@ -431,7 +455,7 @@ class CommonStoreTests(object):
     @inlineCallbacks
     def test_row_collection_delete_existing_row(self):
         rows = yield self.get_empty_row_collection()
-        row_key = yield rows.create(None, {})
+        row_key = (yield rows.create(None, {}))["id"]
         row_keys = yield self.filtered_all_keys(rows)
         self.ensure_equal(row_keys, [row_key])
 
@@ -443,7 +467,7 @@ class CommonStoreTests(object):
     @inlineCallbacks
     def test_row_collection_update(self):
         rows = yield self.get_empty_row_collection()
-        row_key = yield rows.create(None, {})
+        row_key = (yield rows.create(None, {}))["id"]
         row_data = yield rows.get(row_key)
         self.ensure_equal(row_data, {'id': row_key, 'data': {}})
 

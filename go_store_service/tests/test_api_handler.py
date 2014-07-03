@@ -120,7 +120,7 @@ class TestCollectionHandler(TestCase):
     def test_post(self):
         data = yield self.app_helper.post(
             '/root', data=json.dumps({"hello": "world"}), parser='json')
-        self.assertEqual(data.keys(), ["id"])
+        self.assertEqual(data, {"id": data["id"], "data": {"hello": "world"}})
         self.assertEqual(self.collection_data[data["id"]], {"hello": "world"})
 
 

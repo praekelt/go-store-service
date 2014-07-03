@@ -129,8 +129,7 @@ class CollectionHandler(BaseHandler):
         """
         data = json.loads(self.request.body)
         d = self.collection.create(None, data)
-        # TODO: better output once .create returns better things
-        d.addCallback(lambda object_id: self.write_object({"id": object_id}))
+        d.addCallback(self.write_object)
         d.addErrback(self.raise_err, 500, "Failed to create object.")
         return d
 

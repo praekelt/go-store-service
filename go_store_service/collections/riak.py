@@ -54,7 +54,7 @@ class StoreCollection(object):
             object_id = uuid4().hex
         store_model = self._stores(object_id, data=data)
         d = store_model.save()
-        d.addCallback(lambda _: object_id)
+        d.addCallback(self._format_data)
         return d
 
     @inlineCallbacks
@@ -133,7 +133,7 @@ class RowCollection(object):
             object_id = uuid4().hex
         row_model = self._rows(self._key(object_id), data=data)
         d = row_model.save()
-        d.addCallback(lambda _: object_id)
+        d.addCallback(self._format_data)
         return d
 
     @inlineCallbacks
