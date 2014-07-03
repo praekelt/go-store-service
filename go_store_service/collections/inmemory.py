@@ -60,7 +60,6 @@ class InMemoryCollection(object):
 
     def _get_data(self, object_id):
         key = self._id_to_key(object_id)
-        print "key:", key
         if key not in self._data:
             return None
         return self._format_data(object_id, self._data[key])
