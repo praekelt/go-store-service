@@ -54,14 +54,18 @@ class InMemoryCollection(object):
         return True
 
     def _set_data(self, object_id, data):
-        # TODO: Get 'id' out of object data.
-        row_data = data.copy()
-        row_data['id'] = object_id
-        self._data[self._id_to_key(object_id)] = deepcopy(row_data)
+        key = self._id_to_key(object_id)
+        self._data[key] = deepcopy(data)
+        return self._format_data(object_id, self._data[key])
 
     def _get_data(self, object_id):
-        data = self._data.get(self._id_to_key(object_id), None)
-        return deepcopy(data)
+        key = self._id_to_key(object_id)
+        if key not in self._data:
+            return None
+        return self._format_data(object_id, self._data[key])
+
+    def _format_data(self, object_id, data):
+        return {'id': object_id, 'data': deepcopy(data)}
 
     def _get_keys(self):
         return [
@@ -79,17 +83,16 @@ class InMemoryCollection(object):
         return self._defer(self._get_data(object_id))
 
     def create(self, object_id, data):
-        assert 'id' not in data  # TODO: Something better than assert.
         if object_id is None:
             object_id = uuid4().hex
-        self._set_data(object_id, data)
-        return self._defer(object_id)
+        response = self._set_data(object_id, data)
+        return self._defer(response)
 
     def update(self, object_id, data):
         assert object_id is not None  # TODO: Something better than assert.
         assert self._id_to_key(object_id) in self._data
-        self._set_data(object_id, data)
-        return self._defer(self._get_data(object_id))
+        response = self._set_data(object_id, data)
+        return self._defer(response)
 
     def delete(self, object_id):
         data = self._get_data(object_id)
